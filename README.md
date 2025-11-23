@@ -1,6 +1,6 @@
 # GitMan: AI Git Helper for VS Code
 
-![GitMan Logo](https://raw.githubusercontent.com/Gopikrish-30/GitMan-v1.0/main/media/icon.png)
+![GitMan Logo](media/icon.png)
 
 **GitMan** is a powerful VS Code extension that combines standard Git operations with AI-powered assistance. It streamlines your workflow by providing a modern sidebar interface for git commands and an integrated AI chat to answer your questions.
 

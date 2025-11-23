@@ -4,6 +4,11 @@
   "publisher": "gitman",
   "description": "A VS Code extension for Git operations and ChatGPT assistance.",
   "version": "0.0.1",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gopikrish-30/GitMan-v1.0.git"
+  },
   "engines": {
     "vscode": "^1.106.1"
   },
@@ -21,7 +26,7 @@
         {
           "id": "git-helper-sidebar",
           "title": "Git Helper",
-          "icon": "$(github)"
+          "icon": "media/icon.png"
         }
       ]
     },
