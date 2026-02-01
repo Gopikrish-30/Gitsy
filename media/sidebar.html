@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; img-src {{cspSource}} https:; script-src {{cspSource}} 'unsafe-inline'; style-src {{cspSource}} 'unsafe-inline'; font-src {{cspSource}};">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            --bg-color: var(--vscode-sideBar-background);
+            --card-bg: var(--vscode-editor-background);
+            --border-color: var(--vscode-widget-border);
+            --text-primary: var(--vscode-foreground);
+            --text-secondary: var(--vscode-descriptionForeground);
+            --accent: var(--vscode-button-background);
+            --accent-hover: var(--vscode-button-hoverBackground);
+            --hover-bg: var(--vscode-list-hoverBackground);
+            --input-bg: var(--vscode-input-background);
+            --input-border: var(--vscode-input-border);
+            --button-blue: #007acc;
+            --button-blue-hover: #0062a3;
+            --success: #238636;
+            --error: #d73a49;
+        }
+
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 0;
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        /* --- Tabs --- */
+        .tab-nav {
+            display: flex;
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .tab-link {
+            flex: 1;
+            padding: 10px 0;
+            text-align: center;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .tab-link:hover {
+            color: var(--text-primary);
+        }
+
+        .tab-link.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* --- Content Layout --- */
+        .tab-content {
+            display: none;
+            padding: 16px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* --- Profile Header --- */
+        .profile-card {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .profile-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .profile-info {
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .profile-name {
+            font-weight: 600;
+            display: block;
+        }
+
+        .profile-email {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .profile-settings-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .profile-settings-btn:hover {
+            background-color: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+
+        /* --- Repository Info Card --- */
+        .repo-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .repo-header {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .repo-header-title {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .repo-header-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: var(--accent);
+            color: white;
+            border-radius: 10px;
+        }
+
+        .repo-row {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .repo-row:last-child {
+            border-bottom: none;
+        }
+
+        .repo-label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .repo-value {
+            font-family: monospace;
+            font-size: 0.95em;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .copy-btn {
+            cursor: pointer;
+            opacity: 0.5;
+            font-size: 1.1em;
+        }
+
+        .copy-btn:hover {
+            opacity: 1;
+        }
+
+
+        /* --- File Status List --- */
+        .status-section {
+            margin-bottom: 20px;
+        }
+
+        .section-header {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .file-list {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            border-radius: 6px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            font-size: 12px;
+            font-family: monospace;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-item:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .file-path {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 10px;
+        }
+
+        .file-status {
+            font-weight: bold;
+        }
+
+        /* Modified */
+        .status-M {
+            color: #e2c08d;
+        }
+
+        /* Added */
+        .status-A {
+            color: #73c991;
+        }
+
+        /* Deleted */
+        .status-D {
+            color: #f14c4c;
+        }
+
+        /* Unmerged/Conflict */
+        .status-U {
+            color: #ff6b6b;
+        }
+
+        /* Untracked */
+        .status-\? {
+            color: #ffa500;
+        }
+
+        /* Renamed */
+        .status-R {
+            color: #82aaff;
+        }
+
+        /* Copied */
+        .status-C {
+            color: #c792ea;
+        }
+        
+        /* Unsaved changes indicator */
+        .file-status::after {
+            content: attr(data-unsaved);
+            color: #ffa500;
+            font-weight: bold;
+            margin-left: 4px;
+        }
+
+
+        /* --- Action Buttons --- */
+        .primary-btn {
+            width: 100%;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: background-color 0.2s;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .primary-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .secondary-btn {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        .secondary-btn:hover {
+            background-color: var(--hover-bg);
+            border-color: var(--accent);
+        }
+
+        .btn-icon {
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+
+        /* --- Setup View (Clean & Professional) --- */
+        .setup-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 40px 24px;
+            text-align: center;
+            box-sizing: border-box;
+            background: var(--bg-color);
+        }
+
+        .setup-logo-container {
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, #007acc 0%, #0098ff 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            box-shadow: 0 8px 24px rgba(0, 122, 204, 0.25);
+            margin-bottom: 24px;
+        }
+
+        .setup-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.3px;
+            color: var(--text-primary);
+        }
+
+        .setup-desc {
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            font-size: 13px;
+            line-height: 1.6;
+            max-width: 280px;
+        }
+
+        .auth-btn {
+            width: 100%;
+            max-width: 280px;
+            background-color: #24292e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-btn:hover {
+            background-color: #2f363d;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .auth-btn:active {
+            transform: scale(0.98);
+        }
+
+        .auth-btn svg {
+            fill: white;
+        }
+
+        .auth-help-text {
+            margin-top: 20px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: opacity 0.3s;
+            max-width: 280px;
+            line-height: 1.5;
+        }
+
+        .auth-help-text.visible {
+            opacity: 0.7;
+        }
+
+        .auth-footer {
+            margin-top: 32px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            opacity: 0.6;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+
+        /* --- Forms --- */
+        .input {
+            background: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--input-border);
+            padding: 8px;
+            width: 100%;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+            outline: none;
+            font-family: inherit;
+        }
+
+        .input:focus {
+            border-color: var(--accent);
+        }
+
+        /* --- Modal --- */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 20px;
+            width: 85%;
+            max-width: 350px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        }
+
+        .modal-header {
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .close-modal {
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        /* --- Scrollbar --- */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* --- Alerts & PRs --- */
+        .alert-banner {
+            background-color: #d29922;
+            /* Warning Orange */
+            color: #24292f;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .pr-item {
+            display: flex;
+            flex-direction: column;
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.1s;
+        }
+
+        .pr-item:last-child {
+            border-bottom: none;
+        }
+
+        .pr-item:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .pr-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .pr-meta {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .pr-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .pr-action-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pr-action-btn:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+            border-color: var(--text-primary);
+        }
+
+        .ci-badge {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+    </style>
+    <style>
+        /* --- Antigravity UI Theme --- */
+        :root {
+            --bg-color: #0d1117;
+            /* VS Code dark dim */
+            --card-bg: #161b22;
+            --border-color: #30363d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --accent: #1f6feb;
+            --accent-hover: #388bfd;
+            --hover-bg: #21262d;
+            --input-bg: #0d1117;
+            --user-bubble-bg: #21262d;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* --- Chat Layout --- */
+        #chat {
+            height: 100vh;
+            /* display: flex;  <-- Removed permanent flex */
+            /* flex-direction: column; <-- Moved to .active */
+            overflow: hidden !important;
+            padding: 0;
+            background: var(--bg-color);
+        }
+
+        /* Only show as flex when active tab */
+        #chat.active {
+            display: flex !important;
+            flex-direction: column;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #chat-history {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scroll-behavior: smooth;
+        }
+
+        /* --- Message Cards --- */
+        .message-row {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-width: 100%;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .message-row.user {
+            align-items: flex-end;
+        }
+
+        .message-row.assistant {
+            align-items: flex-start;
+        }
+
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13.5px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            max-width: 90%;
+        }
+
+        .message-bubble.user {
+            background-color: var(--user-bubble-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .message-bubble.assistant {
+            background-color: transparent;
+            /* Agent text blends w/ bg usually, or card */
+            padding-left: 0;
+            color: var(--text-primary);
+        }
+
+        /* Agent Card (for specific blocks like 'Thought', 'Result') */
+        .agent-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .agent-card-title {
+            font-size: 0.85em;
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* --- Input Area --- */
+        .chat-input-area {
+            position: relative;
+            flex-shrink: 0;
+            padding: 12px 12px 24px 12px;
+            /* Reduced specific padding */
+            background: var(--bg-color);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            /* Reduced gap */
+            z-index: 10;
+            box-sizing: border-box;
+            /* Critical for sizing */
+            width: 100%;
+        }
+
+        .icon-btn {
+            color: var(--text-secondary);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            /* Prevent squishing */
+        }
+
+        .icon-btn:hover {
+            color: var(--text-primary);
+            background: var(--hover-bg);
+        }
+
+        .chat-input-wrapper {
+            flex: 1;
+            min-width: 0;
+            /* Allow flex item to shrink below content size */
+            background: #161b22;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px 10px;
+            /* Tighter padding inside */
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            transition: border-color 0.2s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+        }
+
+        .chat-input-wrapper:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        #chat-input {
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            flex: 1;
+            min-width: 0;
+            /* Allow shrinking */
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            height: 20px;
+            min-height: 20px;
+            max-height: 150px;
+            font-size: 13.5px;
+            line-height: 1.5;
+            padding: 0;
+            margin-bottom: 2px;
+        }
+
+        .send-btn-mini {
+            background: var(--accent);
+            color: white;
+            border-radius: 6px;
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .send-btn-mini:hover {
+            background: var(--accent-hover);
+        }
+
+        .chat-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            opacity: 0.4;
+            color: var(--text-secondary);
+            padding-bottom: 40px;
+            text-align: center;
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Setup View -->
+    <div id="setup-view" class="setup-container">
+        <div class="setup-logo-container">
+            <div style="font-size: 36px;">🚀</div>
+        </div>
+        <div class="setup-title">GitWise</div>
+        <div class="setup-desc">
+            AI-powered Git management for modern developers. Connect your GitHub account to get started.
+        </div>
+
+        <button class="auth-btn" onclick="connectGitHub()">
+            <svg height="20" viewBox="0 0 16 16" version="1.1" width="20" aria-hidden="true">
+                <path fill-rule="evenodd"
+                    d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z">
+                </path>
+            </svg>
+            Connect with GitHub
+        </button>
+
+        <div id="auth-help" class="auth-help-text">
+            Secure OAuth 2.0 authentication
+        </div>
+
+        <div class="auth-footer">
+            <span>🔒</span>
+            <span>Your data stays secure and private</span>
+        </div>
+    </div>
+
+
+
+    <!-- Main View -->
+    <div id="main-view" style="display: none;">
+        <div class="tab-nav">
+            <button class="tab-link active" onclick="openTab('dashboard')">Dashboard</button>
+            <button class="tab-link" onclick="openTab('chat')">Chat</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+
+            <!-- Alerts -->
+            <div id="state-alerts"></div>
+
+            <!-- Profile -->
+            <div class="profile-card">
+                <div class="profile-avatar" id="user-avatar">?</div>
+                <div class="profile-info">
+                    <span class="profile-name" id="user-name">Guest</span>
+                    <span class="profile-email" id="user-email">Not logged in</span>
+                </div>
+                <button class="profile-settings-btn" onclick="openTab('profile')" title="Settings">⚙️</button>
+            </div>
+
+            <!-- Remote Repo Section -->
+            <div class="section-header" style="margin-top: 20px;">Remote Repo</div>
+            <div class="repo-card" style="padding: 16px;">
+                <div style="margin-bottom: 12px;">
+                    <span class="repo-label" style="display:block; margin-bottom:4px;">Repo Name</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span id="repo-name" style="font-size:1.1em; font-weight:600;">No Repository</span>
+                        <span class="copy-btn" title="Copy Name" onclick="copyToClipboard('repo-name')">❐</span>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <span class="repo-label" style="display:block; margin-bottom:4px;">Repo URL</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span id="repo-path"
+                            style="font-family:monospace; font-size:0.9em; word-break:break-all; white-space:normal; display:block; padding-right:8px;">...</span>
+                        <span class="copy-btn" title="Copy URL" onclick="copyToClipboard('repo-path')">❐</span>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="repo-label" style="display:block; margin-bottom:4px;">Lastly Pushed</span>
+                    <span id="repo-last-commit" style="font-family:monospace;">-</span>
+                </div>
+            </div>
+
+            <!-- Branch & Status Grid -->
+            <div class="action-grid">
+                <div class="secondary-btn"
+                    style="align-items: center; justify-content: center; cursor: default; height: 60px;">
+                    <span class="repo-label" style="font-size: 0.7em; text-transform: uppercase;">Current
+                        Branch</span>
+                    <span id="stat-branch"
+                        style="font-size: 1.1em; font-weight: 700; color: var(--button-blue);">-</span>
+                </div>
+                <div class="secondary-btn"
+                    style="align-items: center; justify-content: center; cursor: default; height: 60px;">
+                    <span class="repo-label" style="font-size: 0.7em; text-transform: uppercase;">Repo Status</span>
+                    <span id="stat-status"
+                        style="font-size: 1.1em; font-weight: 700; color: var(--button-blue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">-</span>
+                </div>
+            </div>
+
+            <!-- Pull Requests -->
+            <div class="status-section" id="pr-section" style="display:none;">
+                <div class="section-header">Pull Requests</div>
+                <div class="file-list" id="pr-list" style="max-height: 200px;"></div>
+            </div>
+
+            <!-- File Status -->
+            <div class="status-section">
+                <div class="section-header">File Status</div>
+                <div class="file-list" id="repo-status-list">
+                    <div style="padding:10px; color:var(--text-secondary); text-align:center;">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Fast Push -->
+            <button class="primary-btn" onclick="openFastPushModal()">
+                <span>⚡</span> Fast Push
+            </button>
+
+            <!-- Sync Actions -->
+            <div class="section-header">Sync</div>
+            <div class="action-grid">
+                <button class="secondary-btn" onclick="gitAction('pull')">
+                    <span class="btn-icon">↓</span> Pull
+                </button>
+                <button class="secondary-btn" onclick="gitAction('push')">
+                    <span class="btn-icon">↑</span> Push
+                </button>
+                <button class="secondary-btn" onclick="promptCommit()">
+                    <span class="btn-icon">●</span> Commit
+                </button>
+                <button class="secondary-btn" id="btn-stash" onclick="gitAction('stash')">
+                    <span class="btn-icon">≡</span> Stash
+                </button>
+            </div>
+
+            <!-- Branch Actions -->
+            <div class="section-header">Branching</div>
+            <div class="action-grid">
+                <button class="secondary-btn" onclick="promptCreateBranch()">
+                    <span class="btn-icon">+</span> New
+                </button>
+                <button class="secondary-btn" onclick="promptSwitchBranch()">
+                    <span class="btn-icon">⇄</span> Switch
+                </button>
+                <button class="secondary-btn" onclick="promptMergeBranch()">
+                    <span class="btn-icon">⑃</span> Merge
+                </button>
+                <button class="secondary-btn" onclick="promptDeleteBranch()">
+                    <span class="btn-icon">🗑</span> Delete
+                </button>
+            </div>
+
+
+
+        </div>
+
+        <!-- Chat Tab -->
+        <div id="chat" class="tab-content" style="height: 100vh; padding: 0; box-sizing: border-box;">
+
+            <div class="chat-container">
+                <div id="chat-history">
+                    <div class="chat-placeholder">
+                        <div style="font-size: 24px; margin-bottom: 10px;">⚡</div>
+                        <div>Ask anything (Ctrl+L)</div>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <button class="icon-btn" title="Add Attachment">+</button>
+
+                    <div class="chat-input-wrapper">
+                        <textarea id="chat-input" rows="1" placeholder="Ask anything..."
+                            oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
+                        <button class="icon-btn" title="Voice Mode" style="margin-left:4px;">🎤</button>
+                        <button class="send-btn-mini" onclick="sendChat()" style="margin-left:4px;">➔</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile/Settings Tab -->
+        <div id="profile" class="tab-content">
+            <div style="margin-bottom: 20px;">
+                <button class="secondary-btn" style="display:inline-block; width:auto; padding: 4px 8px;"
+                    onclick="openTab('dashboard')">← Back</button>
+            </div>
+
+            <div class="profile-card">
+                <div class="profile-avatar" id="profile-avatar">?</div>
+                <div class="profile-info">
+                    <span class="profile-name" id="profile-name">Guest</span>
+                </div>
+            </div>
+
+            <!-- Settings Form -->
+            <div class="section-header" style="margin-top:20px;">Settings</div>
+
+            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">API
+                Provider</label>
+            <select id="settings-provider" class="input">
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="ollama">Ollama</option>
+            </select>
+
+            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Base URL</label>
+            <input type="text" id="settings-base-url" class="input" placeholder="e.g. https://api.openai.com/v1">
+
+            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Model Name</label>
+            <input type="text" id="settings-model" class="input" placeholder="e.g. gpt-4o">
+
+            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">API Key</label>
+            <input type="password" id="settings-api-key" class="input" placeholder="••••••••">
+
+            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">GitHub PAT</label>
+            <input type="password" id="settings-pat" class="input" placeholder="••••••••">
+
+            <button class="primary-btn" onclick="saveSettings()">Save Settings</button>
+
+            <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
+                <button class="primary-btn" style="background-color: var(--error);"
+                    onclick="logoutGitHub()">Logout</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modals (Fast Push) -->
+    <div id="fast-push-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>⚡ Fast Push Setup</span>
+                <span class="close-modal" onclick="closeFastPushModal()">×</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" style="font-weight: 600;">Destination</label>
+                <div class="radio-group" style="margin-top: 8px;">
+                    <label class="radio-label">
+                        <input type="radio" name="repo-type" value="existing" checked onchange="toggleRepoInputs()">
+                        Existing Remote
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="repo-type" value="new" onchange="toggleRepoInputs()">
+                        Create New Repo
+                    </label>
+                </div>
+            </div>
+
+            <!-- Existing Repo Flow -->
+            <div id="existing-repo-input" class="form-group">
+                <label class="form-label">Repository</label>
+                <select id="fp-repo-select" class="input" onchange="updateRepoUrlFromSelect()">
+                    <option value="">Loading...</option>
+                </select>
+                <input type="text" id="fp-repo-url" class="input" placeholder="Or paste Git URL manually..."
+                    style="margin-top: 5px; display:none;">
+                <div style="font-size:10px; color:var(--text-secondary); text-align:right; margin-top:2px;">
+                    <a href="#" onclick="document.getElementById('fp-repo-url').style.display='block'; return false;"
+                        style="color:var(--text-secondary); text-decoration:none;">Enter URL manually</a>
+                </div>
+            </div>
+
+            <!-- New Repo Flow -->
+            <div id="new-repo-input" class="form-group" style="display: none;">
+                <label class="form-label">New Repository Name</label>
+                <input type="text" id="fp-new-repo-name" class="input" placeholder="e.g. my-project">
+
+                <label class="form-label">Description (optional)</label>
+                <input type="text" id="fp-new-repo-desc" class="input" placeholder="Project description">
+
+                <label class="form-label">Visibility</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="repo-visibility" value="private" checked>
+                        🔒 Private
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="repo-visibility" value="public">
+                        🌍 Public
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Branch</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <!-- Select for existing -->
+                    <select id="fp-branch-select" class="input" style="flex:1;">
+                        <option value="main">main</option>
+                        <option value="master">master</option>
+                    </select>
+
+                    <!-- Input for new -->
+                    <input type="text" id="fp-new-branch-input" class="input" style="display: none; flex:1;"
+                        placeholder="New branch name (e.g. feature/xyz)">
+
+                    <!-- Actions -->
+                    <button id="btn-add-branch" class="secondary-btn"
+                        style="width:auto; padding:0 10px; height:100%; justify-content:center;"
+                        onclick="showNewBranchInput()" title="Create New Branch">
+                        +
+                    </button>
+                    <button id="btn-cancel-branch" class="secondary-btn"
+                        style="width:auto; padding:0 10px; height:100%; justify-content:center; display:none;"
+                        onclick="cancelNewBranchInput()" title="Cancel New Branch">
+                        ×
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Commit Message</label>
+                <input type="text" id="fp-message" class="input" value="Fast Push: Auto-commit">
+            </div>
+
+            <button class="primary-btn" onclick="submitFastPush()">🚀 Push Everything</button>
+        </div>
+    </div>
+
+    <script nonce="{{nonce}}">
+        const vscode = acquireVsCodeApi();
+
+        window.addEventListener('DOMContentLoaded', () => {
+            vscode.postMessage({ type: 'get-auth-state' });
+        });
+
+        /* --- UI Helpers --- */
+        function openTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-link').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+
+            // Highlight tab button
+            const btns = document.querySelectorAll('.tab-link');
+            btns.forEach(btn => {
+                if (btn.innerText.toLowerCase().includes(tabName)) {
+                    btn.classList.add('active');
+                }
+            });
+
+            if (tabName === 'profile') {
+                vscode.postMessage({ type: 'get-settings' });
+            }
+        }
+
+        function copyToClipboard(elementId) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            const text = el.innerText;
+            const area = document.createElement('textarea');
+            area.value = text;
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            document.body.removeChild(area);
+            vscode.postMessage({ type: 'onInfo', value: 'Copied!' });
+        }
+
+        /* --- Actions --- */
+        function connectGitHub() { vscode.postMessage({ type: 'login-github' }); }
+        function logoutGitHub() { vscode.postMessage({ type: 'logout-github' }); }
+        function refreshStats() { vscode.postMessage({ type: 'refresh-stats' }); }
+
+        function gitAction(action, payload = {}) {
+            vscode.postMessage({ type: 'git-action', action, payload });
+        }
+        function promptCommit() { gitAction('commit'); }
+        function promptCreateBranch() { gitAction('create-branch'); }
+        function promptSwitchBranch() { gitAction('switch-branch'); }
+        function promptMergeBranch() { gitAction('merge-branch'); }
+        function promptDeleteBranch() { gitAction('delete-branch'); }
+
+        function sendChat() {
+            const input = document.getElementById('chat-input');
+            const value = input.value;
+            if (!value) return;
+            // Append user msg locally for instant feedback
+            addChatMessage({ role: 'user', content: value });
+            vscode.postMessage({ type: 'chat-query', value });
+            input.value = '';
+        }
+
+        function addChatMessage(msg) {
+            const history = document.getElementById('chat-history');
+            const div = document.createElement('div');
+            div.style.padding = '8px';
+            div.style.marginBottom = '8px';
+            div.style.borderRadius = '6px';
+            div.style.fontSize = '12px';
+
+            if (msg.role === 'user') {
+                div.style.background = 'var(--accent)';
+                div.style.color = 'white';
+                div.style.marginLeft = '20px';
+            } else {
+                div.style.background = 'var(--hover-bg)';
+                div.style.marginRight = '20px';
+            }
+            div.innerText = msg.content;
+            history.appendChild(div);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        /* --- Fast Push Modal Logic --- */
+        function openFastPushModal() {
+            document.getElementById('fast-push-modal').style.display = 'flex';
+            vscode.postMessage({ type: 'get-repos' });
+
+            // Pre-fill current remote if available
+            const currentRemote = document.getElementById('repo-path').innerText;
+            if (currentRemote && currentRemote !== '...' && currentRemote !== 'No origin') {
+                document.getElementById('fp-repo-url').value = currentRemote;
+                // Make manual input visible if pre-filled
+                document.getElementById('fp-repo-url').style.display = 'block';
+                // Fetch branches for this remote
+                vscode.postMessage({ type: 'get-remote-branches', value: currentRemote });
+            }
+        }
+
+        function closeFastPushModal() {
+            document.getElementById('fast-push-modal').style.display = 'none';
+        }
+
+
+
+
+        function toggleRepoInputs() {
+            const type = document.querySelector('input[name="repo-type"]:checked').value;
+            document.getElementById('existing-repo-input').style.display = type === 'existing' ? 'block' : 'none';
+            document.getElementById('new-repo-input').style.display = type === 'new' ? 'block' : 'none';
+        }
+
+        function showNewBranchInput() {
+            document.getElementById('fp-branch-select').style.display = 'none';
+            document.getElementById('btn-add-branch').style.display = 'none';
+
+            document.getElementById('fp-new-branch-input').style.display = 'block';
+            document.getElementById('btn-cancel-branch').style.display = 'flex'; // secondary-btn uses flex
+
+            document.getElementById('fp-new-branch-input').focus();
+        }
+
+        function cancelNewBranchInput() {
+            document.getElementById('fp-new-branch-input').value = ''; // clear
+            document.getElementById('fp-new-branch-input').style.display = 'none';
+            document.getElementById('btn-cancel-branch').style.display = 'none';
+
+            document.getElementById('fp-branch-select').style.display = 'block';
+            document.getElementById('btn-add-branch').style.display = 'flex';
+        }
+
+        function submitFastPush() {
+            const repoType = document.querySelector('input[name="repo-type"]:checked').value;
+            let repoUrl = document.getElementById('fp-repo-select').value;
+            const manualUrl = document.getElementById('fp-repo-url').value;
+
+            // Setup Repo URL
+            if (repoType === 'existing') {
+                if (manualUrl && document.getElementById('fp-repo-url').style.display !== 'none') {
+                    repoUrl = manualUrl;
+                }
+                if (!repoUrl) {
+                    vscode.postMessage({ type: 'error', value: 'Please select a repository or enter a URL.' });
+                    return;
+                }
+            }
+
+            // New Repo Details
+            const newRepoName = document.getElementById('fp-new-repo-name').value;
+            const newRepoDesc = document.getElementById('fp-new-repo-desc').value;
+            const visibility = document.querySelector('input[name="repo-visibility"]:checked').value;
+            const newRepoPrivate = visibility === 'private';
+
+            if (repoType === 'new' && !newRepoName) {
+                vscode.postMessage({ type: 'error', value: 'Please enter a name for the new repository.' });
+                return;
+            }
+
+            let branch = document.getElementById('fp-branch-select').value;
+            const newBranchInput = document.getElementById('fp-new-branch-input');
+            if (newBranchInput.style.display !== 'none' && newBranchInput.value.trim()) {
+                branch = newBranchInput.value.trim();
+            }
+            const message = document.getElementById('fp-message').value;
+
+            vscode.postMessage({
+                type: 'fast-push-execute',
+                payload: {
+                    repoType,
+                    repoUrl,
+                    newRepoName,
+                    newRepoDesc,
+                    newRepoPrivate,
+                    branch,
+                    message
+                }
+            });
+            closeFastPushModal();
+        }
+
+
+
+        function showPatLogin() {
+            document.getElementById('setup-view').style.display = 'none';
+            document.getElementById('pat-view').style.display = 'flex';
+        }
+        function showSetup() {
+            document.getElementById('setup-view').style.display = 'flex';
+            document.getElementById('main-view').style.display = 'none';
+        }
+
+
+        function saveSettings() {
+            const provider = document.getElementById('settings-provider').value;
+            const baseUrl = document.getElementById('settings-base-url').value;
+            const modelName = document.getElementById('settings-model').value;
+            const apiKey = document.getElementById('settings-api-key').value;
+            const pat = document.getElementById('settings-pat').value;
+
+            vscode.postMessage({
+                type: 'save-settings',
+                value: {
+                    provider,
+                    baseUrl,
+                    modelName,
+                    apiKey,
+                    pat
+                }
+            });
+        }
+
+        /* --- Event Listener --- */
+        window.addEventListener('message', event => {
+            const message = event.data;
+            const type = message.type;
+            const value = message.value;
+
+            switch (type) {
+                case 'populate-settings':
+                    if (value.provider) document.getElementById('settings-provider').value = value.provider;
+                    if (value.baseUrl) document.getElementById('settings-base-url').value = value.baseUrl;
+                    if (value.modelName) document.getElementById('settings-model').value = value.modelName;
+                    break;
+                case 'set-loading':
+                    const btn = document.querySelector('#setup-view .auth-btn');
+                    const helpText = document.getElementById('auth-help');
+                    if (btn) {
+                        if (value) {
+                            btn.innerHTML = '<span>⏳</span> Redirecting...';
+                            btn.style.opacity = '0.7';
+                            btn.style.pointerEvents = 'none';
+                            if (helpText) helpText.classList.add('visible');
+                        } else {
+                            // Restore button content
+                            btn.innerHTML = `<svg height="20" viewBox="0 0 16 16" version="1.1" width="20" aria-hidden="true" style="fill:white; margin-right:10px;"><path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg> Connect with GitHub`;
+                            btn.style.opacity = '1';
+                            btn.style.pointerEvents = 'auto';
+                            if (helpText) helpText.classList.remove('visible');
+                        }
+                    }
+                    break;
+                case 'show-dashboard':
+                    document.getElementById('setup-view').style.display = 'none';
+                    document.getElementById('main-view').style.display = 'block';
+                    break;
+                    document.getElementById('setup-view').style.display = 'flex';
+                    document.getElementById('main-view').style.display = 'none';
+                    break;
+
+                case 'update-stats':
+                    if (value.repoName) document.getElementById('repo-name').innerText = value.repoName;
+                    if (value.remote) document.getElementById('repo-path').innerText = value.remote;
+                    if (value.lastCommit) document.getElementById('repo-last-commit').innerText = value.lastCommit;
+                    
+                    // Branch - with tooltip
+                    if (value.branch) {
+                        const branchEl = document.getElementById('stat-branch');
+                        branchEl.innerText = value.branch;
+                        branchEl.title = `Current branch: ${value.branch}`;
+                    }
+                    
+                    if (value.status) {
+                        const isDirty = value.status !== 'Clean' && value.status.trim().length > 0;
+                        document.getElementById('stat-status').innerText = isDirty ? "Pending Changes" : "Synced";
+                        if (!isDirty) {
+                            document.getElementById('stat-status').style.color = 'var(--text-secondary)';
+                        } else {
+                            document.getElementById('stat-status').style.color = 'var(--button-blue)';
+                        }
+                    }
+
+                    if (value.user) {
+                        document.getElementById('user-name').innerText = value.user.name;
+                        document.getElementById('user-email').innerText = value.user.email;
+                        document.getElementById('profile-name').innerText = value.user.name;
+
+                        // Avatar
+                        const avText = value.user.name.charAt(0).toUpperCase();
+                        const avEls = [document.getElementById('user-avatar'), document.getElementById('profile-avatar')];
+                        avEls.forEach(el => {
+                            if (value.user.avatar) {
+                                el.innerText = '';
+                                el.style.backgroundImage = `url('${value.user.avatar}')`;
+                                el.style.backgroundSize = 'cover';
+                            } else {
+                                el.innerText = avText;
+                            }
+                        });
+                    }
+
+                    // Alerts
+                    const alerts = [];
+                    if (value.rebaseStatus) alerts.push({ text: value.rebaseStatus, icon: '⚠️' });
+                    if (value.mergeStatus) alerts.push({ text: value.mergeStatus, icon: '⚠️' });
+                    if (value.conflicts && value.conflicts.length > 0) alerts.push({ text: `Conflicts: ${value.conflicts.length} files`, icon: '🛑' });
+
+                    const alertContainer = document.getElementById('state-alerts');
+                    if (alertContainer) {
+                        alertContainer.innerHTML = '';
+                        alerts.forEach(a => {
+                            const d = document.createElement('div');
+                            d.className = 'alert-banner';
+                            d.innerHTML = `<span>${a.icon}</span> ${a.text}`;
+                            alertContainer.appendChild(d);
+                        });
+                    }
+
+                    // CI Status Badge
+                    if (value.commitStatus) {
+                        const branchEl = document.getElementById('stat-branch');
+                        let color = 'var(--text-secondary)';
+                        if (value.commitStatus === 'SUCCESS') color = 'var(--success)';
+                        else if (value.commitStatus === 'FAILURE' || value.commitStatus === 'ERROR') color = 'var(--error)';
+                        else if (value.commitStatus === 'PENDING') color = '#dbab09';
+
+                        let badge = branchEl.querySelector('.ci-badge');
+                        if (!badge) {
+                            badge = document.createElement('span');
+                            badge.className = 'ci-badge';
+                            branchEl.appendChild(badge);
+                        }
+                        badge.style.backgroundColor = color;
+                        badge.title = `CI Status: ${value.commitStatus}`;
+                    }
+
+                    // PRs
+                    const prSection = document.getElementById('pr-section');
+                    const prList = document.getElementById('pr-list');
+                    if (prSection && prList) {
+                        if (value.pullRequests && value.pullRequests.length > 0) {
+                            prSection.style.display = 'block';
+                            prList.innerHTML = '';
+                            value.pullRequests.forEach(pr => {
+                                const d = document.createElement('div');
+                                d.className = 'pr-item';
+                                // separate click for main body vs buttons
+                                d.innerHTML = `
+                                    <div onclick="vscode.postMessage({ type: 'open-external', value: '${pr.url}' })" style="flex:1;">
+                                        <div class="pr-title">#${pr.number} ${pr.title}</div>
+                                        <div class="pr-meta">
+                                            <span>by ${pr.author.login}</span>
+                                            <span>${new Date(pr.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                    <div class="pr-actions">
+                                        <button class="pr-action-btn" title="Checkout Locally" onclick="checkoutPR(${pr.number})">⬇️</button>
+                                        <button class="pr-action-btn" title="Merge PR" onclick="mergePR(${pr.number})">🔀</button>
+                                    </div>
+                                `;
+                                prList.appendChild(d);
+                            });
+                        } else {
+                            prSection.style.display = 'none';
+                        }
+                    }
+
+                    // Stash Count
+                    const btnStash = document.getElementById('btn-stash');
+                    if (btnStash) {
+                        if (value.stashList && value.stashList.length > 0) {
+                            btnStash.innerHTML = `<span class="btn-icon">≡</span> Stash (${value.stashList.length})`;
+                        } else {
+                            btnStash.innerHTML = `<span class="btn-icon">≡</span> Stash`;
+                        }
+                    }
+                    break;
+                case 'update-repo-status-list':
+                    const list = document.getElementById('repo-status-list');
+                    list.innerHTML = '';
+                    if (Array.isArray(value) && value.length > 0) {
+                        value.forEach(item => {
+                            const d = document.createElement('div');
+                            d.className = 'file-item';
+                            d.style.cursor = 'pointer';
+                            
+                            // Check if file has unsaved changes (marked with *)
+                            const hasUnsaved = item.status.includes('*');
+                            const cleanStatus = item.status.replace('*', '');
+                            
+                            // map status char to class
+                            const statusChar = cleanStatus.trim().charAt(0);
+                            const statusClass = 'status-' + statusChar;
+
+                            d.innerHTML = `
+                                <span class="file-path" title="${item.path}">${item.path}</span>
+                                <span class="file-status ${statusClass}" ${hasUnsaved ? 'data-unsaved="*"' : ''}>${cleanStatus}</span>
+                            `;
+                            
+                            // Add click handler to open file
+                            d.addEventListener('click', () => {
+                                vscode.postMessage({ type: 'open-file', value: item.path });
+                            });
+                            
+                            list.appendChild(d);
+                        });
+                    } else {
+                        list.innerHTML = '<div style="padding:10px; color:var(--text-secondary); text-align:center;">No changes</div>';
+                    }
+                    break;
+                case 'add-chat-message':
+                    addChatMessage(value);
+                    break;
+                case 'github-connected':
+                    // Switch to dashboard
+                    document.getElementById('setup-view').style.display = 'none';
+                    document.getElementById('main-view').style.display = 'block';
+                    break;
+                case 'update-repos':
+                    const sel = document.getElementById('fp-repo-select');
+                    const currentRemote = document.getElementById('repo-path').innerText.trim();
+                    sel.innerHTML = '<option value="">Select a repository...</option>';
+                    if (Array.isArray(value)) {
+                        value.forEach(r => {
+                            const opt = document.createElement('option');
+                            opt.value = r.clone_url;
+                            opt.innerText = r.full_name;
+
+                            // Auto-select if matches current remote
+                            // Handle potential .git suffix difference
+                            const normalize = (u) => u.replace(/\.git$/, '').toLowerCase();
+                            if (currentRemote && normalize(r.clone_url) === normalize(currentRemote)) {
+                                opt.selected = true;
+                            }
+
+                            sel.appendChild(opt);
+                        });
+                        // Trigger change event to load branches if one is selected
+                        if (sel.value) {
+                            updateRepoUrlFromSelect();
+                        }
+                    }
+                    break;
+                case 'update-branches':
+                    const branchSel = document.getElementById('fp-branch-select');
+                    const currentBranch = document.getElementById('stat-branch').innerText.trim();
+                    branchSel.innerHTML = '';
+                    if (Array.isArray(value) && value.length > 0) {
+                        let matchFound = false;
+                        value.forEach(b => {
+                            const opt = document.createElement('option');
+                            opt.value = b;
+                            opt.innerText = b;
+                            if (b === currentBranch) {
+                                opt.selected = true;
+                                matchFound = true;
+                            }
+                            branchSel.appendChild(opt);
+                        });
+
+                        // If current branch not found (maybe local only), try main/master defaults
+                        if (!matchFound) {
+                            if (value.includes('main')) branchSel.value = 'main';
+                            else if (value.includes('master')) branchSel.value = 'master';
+                        }
+                    } else {
+                        // Fallback
+                        branchSel.innerHTML = '<option value="main">main</option><option value="master">master</option>';
+                    }
+                    break;
+            }
+        });
+
+        // Update branch list when repo changes
+        function updateRepoUrlFromSelect() {
+            const select = document.getElementById('fp-repo-select');
+            const input = document.getElementById('fp-repo-url');
+            if (select && input) {
+                const url = select.value;
+                input.value = url;
+
+                if (url) {
+                    // Show loading in branch select
+                    const branchSel = document.getElementById('fp-branch-select');
+                    branchSel.innerHTML = '<option>Loading...</option>';
+                    // Fetch branches
+                    vscode.postMessage({ type: 'get-remote-branches', value: url });
+                }
+            }
+        }
+
+        // Trigger for initial load if needed
+        const initialRepo = document.getElementById('repo-path');
+        if (initialRepo && initialRepo.innerText !== '...') {
+            vscode.postMessage({ type: 'get-remote-branches', value: initialRepo.innerText });
+        }
+        // PR Actions
+        function checkoutPR(prNumber) {
+            vscode.postMessage({ type: 'pr-checkout', value: { prNumber } });
+        }
+        function mergePR(prNumber) {
+            vscode.postMessage({ type: 'pr-merge', value: { prNumber } });
+        }
+
+        /* --- Chat Functions --- */
+        /* --- Chat Functions --- */
+        function addChatMessage(msg) {
+            const history = document.getElementById('chat-history');
+
+            // Remove placeholder if exists
+            const placeholder = history.querySelector('.chat-placeholder');
+            if (placeholder) {
+                placeholder.remove();
+            }
+
+            const row = document.createElement('div');
+            row.className = `message-row ${msg.role}`;
+
+            if (msg.role === 'user') {
+                // User: Just simple text block, right aligned
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble user`;
+                bubble.innerText = msg.content;
+                row.appendChild(bubble);
+            } else {
+                // Assistant: Card style
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble assistant`;
+
+                // If content has headers, we can try to separate them into "cards" visually
+                // For now, let's wrap it in a card container if it's long, or just text
+                // Simple parsing: if it starts with "Active Task" or similar, use card style
+
+                // For this mock, we just dump content, but in future can parse "Thoughts", "Tasks"
+                const contentHtml = msg.content.replace(/\n/g, '<br>');
+
+                // Check if it's a structural update (visual hack for demo)
+                if (msg.content.includes('Task:') || msg.content.includes('Files Edited')) {
+                    const card = document.createElement('div');
+                    card.className = 'agent-card';
+                    card.innerHTML = `<div class="agent-card-title">⚡ Update</div><div>${contentHtml}</div>`;
+                    bubble.appendChild(card);
+                } else {
+                    bubble.innerHTML = contentHtml;
+                }
+
+                row.appendChild(bubble);
+            }
+
+            history.appendChild(row);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        // Handle Enter key in chat input
+        document.getElementById('chat-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChat();
+            }
+        });
+    </script>
+</body>
+
+</html>
