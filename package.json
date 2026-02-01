@@ -1,13 +1,13 @@
 {
-  "name": "GitMan",
-  "displayName": "GitMan: AI Git Helper",
-  "publisher": "gitman",
+  "name": "gitwise",
+  "displayName": "GitWise: AI Git Helper",
+  "publisher": "gitwise",
   "description": "A VS Code extension for Git operations and ChatGPT assistance.",
   "version": "0.0.1",
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Gopikrish-30/GitMan-v1.0.git"
+    "url": "https://github.com/Gopikrish-30/GitWise.git"
   },
   "engines": {
     "vscode": "^1.106.1"

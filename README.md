@@ -1,8 +1,8 @@
-# GitMan: AI Git Helper for VS Code
+# GitWise: AI Git Helper for VS Code
 
-![GitMan Logo](media/icon.png)
+![GitWise Logo](media/icon.png)
 
-**GitMan** is a powerful VS Code extension that combines standard Git operations with AI-powered assistance. It streamlines your workflow by providing a modern sidebar interface for git commands and an integrated AI chat to answer your questions.
+**GitWise** is a powerful VS Code extension that combines standard Git operations with AI-powered assistance. It streamlines your workflow by providing a modern sidebar interface for git commands and an integrated AI chat to answer your questions.
 
 ## 🚀 Features
 
@@ -20,12 +20,12 @@
 
 1.  Open **VS Code**.
 2.  Go to the **Extensions** view (`Ctrl+Shift+X`).
-3.  Search for **GitMan**.
+3.  Search for **GitWise**.
 4.  Click **Install**.
 
 ## ⚙️ Setup
 
-1.  **Open the Sidebar**: Click the GitMan icon in the Activity Bar.
+1.  **Open the Sidebar**: Click the GitWise icon in the Activity Bar.
 2.  **Connect GitHub**:
     *   Click "Login with GitHub" to authenticate securely.
     *   Or manually enter a Personal Access Token (PAT).
@@ -70,4 +70,4 @@ Contributions are welcome!
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-**Publisher**: [gitman](https://marketplace.visualstudio.com/publishers/gitman)
+**Publisher**: [gitwise](https://marketplace.visualstudio.com/publishers/gitwise)
