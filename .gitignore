@@ -4,6 +4,9 @@ node_modules
 .vscode-test/
 *.vsix
 
+# Windows reserved filename - cannot be tracked
+nul
+
 # Local IDE and history
 .vscode/
 .vscode-test.mjs

@@ -1,4 +1,4 @@
-// Shared types for GitWise extension
+// Shared types for Gitsy extension
 
 export interface UserProfile {
     login: string;
@@ -75,9 +75,5 @@ export interface GitHubRepo {
 }
 
 export interface Settings {
-    provider?: string;
-    baseUrl?: string;
-    modelName?: string;
-    apiKey?: string;
     pat?: string;
 }

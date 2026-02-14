@@ -4,11 +4,16 @@ import { AuthService } from './authService';
 import { Logger } from './logger';
 import { Cache } from './cache';
 import { RepoStats, UserProfile, FileStatus } from './types';
+import { parseGitHubUrl } from './utils';
 
 export class StatsRefresher {
     private refreshTimeout: NodeJS.Timeout | undefined;
     private statsCache = new Cache<RepoStats>(30); // 30 sec cache
     private userCache = new Cache<UserProfile>(600); // 10 min cache for user profiles
+    private isRefreshing = false; // Prevents concurrent refresh calls
+    private pendingRefresh = false; // Queues one refresh if busy
+    private lastRefreshTime = 0; // Timestamp of last completed refresh
+    private static readonly MIN_REFRESH_INTERVAL = 1000; // Min 1s between refreshes
 
     constructor(
         private context: vscode.ExtensionContext,
@@ -22,62 +27,95 @@ export class StatsRefresher {
         }
         
         if (immediate) {
-            // Immediate refresh for critical events (save, delete, etc.)
-            // Clear cache to force fresh Git status
-            this.statsCache.clear();
-            this.refresh(true).catch(error => {
-                Logger.error('Immediate stats refresh failed', error);
-            });
+            // "Immediate" still goes through debounce to coalesce bursts
+            // (e.g. git operations that touch many .git files at once)
+            this.refreshTimeout = setTimeout(() => {
+                this.statsCache.clear();
+                this.throttledRefresh(true);
+            }, 300); // 300ms debounce for "immediate" events
         } else {
             // Debounced refresh for frequent file changes (typing)
             this.refreshTimeout = setTimeout(() => {
-                this.refresh().catch(error => {
-                    Logger.error('Scheduled stats refresh failed', error);
-                });
-            }, 500); // 500ms debounce for real-time feel
+                this.throttledRefresh(false);
+            }, 800); // 800ms debounce for typing
         }
+    }
+
+    /**
+     * Ensures only one refresh runs at a time and enforces a minimum interval.
+     */
+    private throttledRefresh(forceRefresh: boolean): void {
+        if (this.isRefreshing) {
+            // Already refreshing — queue at most one pending refresh
+            this.pendingRefresh = true;
+            return;
+        }
+
+        const elapsed = Date.now() - this.lastRefreshTime;
+        if (elapsed < StatsRefresher.MIN_REFRESH_INTERVAL) {
+            // Too soon — schedule for later
+            if (this.refreshTimeout) {
+                clearTimeout(this.refreshTimeout);
+            }
+            this.refreshTimeout = setTimeout(() => {
+                this.throttledRefresh(forceRefresh);
+            }, StatsRefresher.MIN_REFRESH_INTERVAL - elapsed);
+            return;
+        }
+
+        this.isRefreshing = true;
+        this.refresh(forceRefresh)
+            .catch(error => Logger.error('Stats refresh failed', error))
+            .finally(() => {
+                this.isRefreshing = false;
+                this.lastRefreshTime = Date.now();
+                if (this.pendingRefresh) {
+                    this.pendingRefresh = false;
+                    // Process queued refresh after a short delay
+                    setTimeout(() => this.throttledRefresh(true), 300);
+                }
+            });
     }
 
     public async refresh(forceRefresh = false): Promise<void> {
         Logger.debug('refreshStats called', { forceRefresh });
 
-        const pat = await this.context.secrets.get("gitwise.githubPat");
+        const pat = await this.context.secrets.get("gitsy.githubPat");
         if (!pat) {
             Logger.debug('No GitHub PAT found, showing setup');
             this.postMessage({ type: 'show-setup' });
             return;
         }
 
+        // === PHASE 0: Send cached profile immediately (0ms) ===
+        let userProfile: UserProfile | null = this.userCache.get('user-profile') || null;
+        if (userProfile) {
+            this.postMessage({ type: 'update-user-quick', value: userProfile });
+        }
+
+        // === PHASE 1: Resolve repo path (fast) ===
         const repoPath = await this.resolveRepoPath();
         if (!repoPath) {
-            Logger.warn('No repository path found - user may not have a workspace open');
-            // Show empty state in UI
-            this.postMessage({ 
-                type: "update-stats", 
+            Logger.warn('No repository path found');
+            this.postMessage({
+                type: "update-stats",
                 value: {
-                    branch: 'No Repo',
-                    remote: 'No Repo',
-                    status: 'No Repo',
-                    repoName: 'No Workspace',
-                    repoPath: 'Open a folder to get started',
-                    lastCommit: 'N/A',
-                    user: null,
-                    rebaseStatus: null,
-                    mergeStatus: null,
-                    stashList: [],
-                    conflicts: [],
-                    pullRequests: [],
-                    commitStatus: null
+                    branch: 'No Repo', remote: 'No Repo', status: 'No Repo',
+                    repoName: 'No Workspace', repoPath: 'Open a folder to get started',
+                    lastCommit: 'N/A', user: userProfile, rebaseStatus: null,
+                    mergeStatus: null, stashList: [], conflicts: [], pullRequests: [], commitStatus: null
                 }
             });
             this.postMessage({ type: 'update-repo-status-list', value: [] });
             return;
         }
 
+        // Check stats cache
         const cacheKey = `stats:${repoPath}`;
         if (!forceRefresh) {
             const cached = this.statsCache.get(cacheKey);
             if (cached) {
+                cached.user = userProfile;
                 this.postMessage({ type: "update-stats", value: cached });
                 this.sendFileStatusList(cached.status);
                 return;
@@ -87,17 +125,11 @@ export class StatsRefresher {
         const gitService = new GitService(repoPath);
 
         try {
-            // Parallelize git operations for better performance
+            // === PHASE 2: Run LOCAL git commands (~200-500ms) ===
+            // These are all local disk operations — very fast
             const [
-                branch,
-                remote,
-                status,
-                repoName,
-                lastCommit,
-                rebaseStatus,
-                mergeStatus,
-                stashList,
-                conflicts
+                branch, remote, status, repoName, lastCommit,
+                rebaseStatus, mergeStatus, stashList, conflicts
             ] = await Promise.all([
                 gitService.getCurrentBranch(),
                 gitService.getRemote(),
@@ -110,12 +142,40 @@ export class StatsRefresher {
                 gitService.getConflicts()
             ]);
 
-            // Fetch user profile if not cached
-            let userProfile: UserProfile | null = this.userCache.get('user-profile') || null;
-            if (!userProfile) {
-                try {
-                    const viewer = await this.authService.getUserProfile(pat);
-                    userProfile = {
+            // SEND GIT DATA TO WEBVIEW IMMEDIATELY — don't wait for network
+            const stats: RepoStats = {
+                branch, remote, status, repoName,
+                repoPath: remote, lastCommit, user: userProfile,
+                rebaseStatus, mergeStatus, stashList, conflicts,
+                pullRequests: [], commitStatus: null
+            };
+            this.postMessage({ type: "update-stats", value: stats });
+            this.sendFileStatusList(status);
+
+            // === PHASE 3: Network calls in background (non-blocking) ===
+            // Profile + PRs + CI status — update webview when each arrives
+            this.fetchNetworkDataInBackground(pat, remote, branch, stats, cacheKey, userProfile);
+
+        } catch (error) {
+            Logger.error('Failed to refresh stats', error, { repoPath });
+            vscode.window.showErrorMessage(`Failed to refresh Git stats: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Fetches profile, PRs, and CI status in background without blocking the UI.
+     * Updates the webview incrementally as each piece of data arrives.
+     */
+    private fetchNetworkDataInBackground(
+        pat: string, remote: string, branch: string,
+        stats: RepoStats, cacheKey: string,
+        currentProfile: UserProfile | null
+    ): void {
+        // Profile fetch (if not cached)
+        if (!currentProfile) {
+            this.authService.getUserProfile(pat)
+                .then(viewer => {
+                    const profile: UserProfile = {
                         login: viewer.login,
                         name: viewer.name || viewer.login,
                         email: viewer.email || 'No email',
@@ -123,69 +183,46 @@ export class StatsRefresher {
                         repos: viewer.repositories?.totalCount || 0,
                         contributions: viewer.contributionsCollection?.contributionCalendar?.totalContributions || 0
                     };
-                    this.userCache.set('user-profile', userProfile, 600); // 10 min
-                } catch (e: any) {
-                    Logger.error('Failed to fetch user profile', e);
-                    userProfile = {
-                        login: 'User',
-                        name: 'GitHub User',
-                        email: 'Profile Error',
-                        avatar: '',
-                        repos: 0,
-                        contributions: 0
-                    };
+                    this.userCache.set('user-profile', profile, 600);
+                    this.postMessage({ type: 'update-user-quick', value: profile });
+                    // Update cached stats with profile
+                    stats.user = profile;
+                    this.statsCache.set(cacheKey, stats);
+                })
+                .catch(e => Logger.error('Background profile fetch failed', e));
+        }
+
+        // PRs + CI status fetch (sequential to avoid flooding)
+        if (remote && remote !== 'No origin' && remote !== 'Unknown') {
+            try {
+                const { owner, repo } = parseGitHubUrl(remote);
+                if (owner && repo) {
+                    // Sequential: PRs first, then CI status
+                    this.authService.getPullRequests(pat, owner, repo)
+                        .then(async (prs) => {
+                            stats.pullRequests = prs;
+                            this.postMessage({ type: "update-stats", value: stats });
+
+                            if (branch && branch !== 'Unknown') {
+                                try {
+                                    const ciStatus = await this.authService.getCommitStatus(pat, owner, repo, branch);
+                                    stats.commitStatus = ciStatus;
+                                } catch (e) {
+                                    Logger.debug('CI status fetch failed (non-critical)', { error: e });
+                                }
+                            }
+
+                            this.statsCache.set(cacheKey, stats);
+                            this.postMessage({ type: "update-stats", value: stats });
+                        })
+                        .catch(e => Logger.error('Background GitHub API fetch failed', e));
                 }
+            } catch (e) {
+                Logger.error('Failed to parse remote URL for API calls', e);
             }
-
-            let pullRequests: any[] = [];
-            let commitStatus: string | null = null;
-
-            if (pat && remote && remote !== 'No origin' && remote !== 'Unknown') {
-                try {
-                    const { owner, repo } = this.parseGitHubUrl(remote);
-
-                    if (owner && repo) {
-                        // Parallelize GitHub API calls
-                        const [prs, status] = await Promise.all([
-                            this.authService.getPullRequests(pat, owner, repo),
-                            branch && branch !== 'Unknown' 
-                                ? this.authService.getCommitStatus(pat, owner, repo, branch)
-                                : Promise.resolve(null)
-                        ]);
-                        pullRequests = prs;
-                        commitStatus = status;
-                    }
-                } catch (e) {
-                    Logger.error('Failed to fetch remote stats from GitHub', e);
-                }
-            }
-
-            const stats: RepoStats = {
-                branch,
-                remote,
-                status,
-                repoName,
-                repoPath: remote,
-                lastCommit,
-                user: userProfile,
-                rebaseStatus,
-                mergeStatus,
-                stashList,
-                conflicts,
-                pullRequests,
-                commitStatus
-            };
-
-            // Cache the stats
+        } else {
+            // No remote — just cache what we have
             this.statsCache.set(cacheKey, stats);
-
-            // Send to webview
-            this.postMessage({ type: "update-stats", value: stats });
-            this.sendFileStatusList(status);
-
-        } catch (error) {
-            Logger.error('Failed to refresh stats', error, { repoPath });
-            vscode.window.showErrorMessage(`Failed to refresh Git stats: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -379,25 +416,6 @@ export class StatsRefresher {
         }
         
         return dirtyFiles;
-    }
-
-    private parseGitHubUrl(url: string): { owner: string; repo: string } {
-        let owner = '';
-        let repo = '';
-
-        if (url.startsWith('http')) {
-            const parts = url.split('/');
-            owner = parts[parts.length - 2] || '';
-            repo = (parts[parts.length - 1] || '').replace('.git', '');
-        } else if (url.startsWith('git@')) {
-            const parts = url.split(':');
-            const path = parts[1] || '';
-            const pathParts = path.split('/');
-            owner = pathParts[0] || '';
-            repo = (pathParts[1] || '').replace('.git', '');
-        }
-
-        return { owner, repo };
     }
 
     public clearCache(): void {

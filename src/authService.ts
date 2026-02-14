@@ -2,8 +2,43 @@ import * as vscode from 'vscode';
 import * as https from 'https';
 import { Logger } from './logger';
 
+/**
+ * Simple serial request queue — runs one request at a time to prevent
+ * TLS handshake failures from too many simultaneous connections.
+ */
+class RequestQueue {
+  private queue: Array<{ run: () => Promise<any>; resolve: (v: any) => void; reject: (e: any) => void }> = [];
+  private running = 0;
+  private readonly maxConcurrent = 2; // max 2 simultaneous connections
+
+  enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      this.queue.push({ run: fn, resolve, reject });
+      this.drain();
+    });
+  }
+
+  private async drain(): Promise<void> {
+    while (this.running < this.maxConcurrent && this.queue.length > 0) {
+      const item = this.queue.shift()!;
+      this.running++;
+      try {
+        const result = await item.run();
+        item.resolve(result);
+      } catch (e) {
+        item.reject(e);
+      } finally {
+        this.running--;
+        this.drain(); // process next
+      }
+    }
+  }
+}
+
+// Single shared queue for all GitHub API requests
+const requestQueue = new RequestQueue();
+
 export class AuthService {
-	// @ts-ignore - context reserved for future use (e.g., secret storage)
 	private context: vscode.ExtensionContext;
 
 	constructor(context: vscode.ExtensionContext) {
@@ -12,58 +47,63 @@ export class AuthService {
 	}
 
 	public async getUserProfile(token: string): Promise<any> {
-		Logger.debug('Fetching user profile');
-		const query = `query {
-			viewer {
-				login
-				name
-				email
-				avatarUrl
-				createdAt
-				followers { totalCount }
-				following { totalCount }
-				repositories(ownerAffiliations: OWNER) { totalCount }
-				starredRepositories { totalCount }
-				gists { totalCount }
-				organizations(first: 10) { nodes { login avatarUrl } }
-				contributionsCollection { contributionCalendar { totalContributions } }
-			}
-		}`;
+		Logger.debug('Fetching user profile via REST');
 
 		try {
-			const response: any = await this.postRequest('https://api.github.com/graphql', JSON.stringify({ query }), {
+			// Fetch sequentially to avoid connection flooding
+			const headers = {
 				'Authorization': `Bearer ${token}`,
-				'Content-Type': 'application/json',
-				'User-Agent': 'VSCode-GitWise',
-			});
+				'User-Agent': 'VSCode-Gitsy',
+				'Accept': 'application/vnd.github.v3+json'
+			};
 
-			if (response.errors) {
-				Logger.error('GitHub GraphQL error', null, { errors: response.errors });
-				throw new Error(response.errors[0].message);
+			// 1. User profile (required)
+			const user = await this.makeRequest('https://api.github.com/user', 'GET', null, headers);
+
+			if (!user || !user.login) {
+				throw new Error('Invalid user response from GitHub API');
 			}
 
-			const viewer = response.data.viewer;
-
-			// Try to get primary email if missing
-			if (!viewer.email) {
+			// 2. Emails (optional, sequential)
+			let email = user.email || '';
+			if (!email) {
 				try {
-					const emails: any = await this.makeRequest('https://api.github.com/user/emails', 'GET', null, {
-						'Authorization': `Bearer ${token}`,
-						'User-Agent': 'VSCode-GitWise',
-					});
+					const emails = await this.makeRequest('https://api.github.com/user/emails', 'GET', null, headers);
 					if (Array.isArray(emails)) {
 						const primary = emails.find((e: any) => e.primary);
-						if (primary) {
-							viewer.email = primary.email;
-						}
+						if (primary) { email = primary.email; }
 					}
-				} catch (e) {
-					Logger.warn("Failed to fetch emails via REST", { error: e });
+				} catch {
+					Logger.debug('Could not fetch email (non-critical)');
 				}
 			}
 
-			Logger.info('User profile fetched successfully', { login: viewer.login });
-			return viewer;
+			// 3. Contributions (optional, sequential)
+			let contributions = 0;
+			try {
+				const contribQuery = `query { viewer { contributionsCollection { contributionCalendar { totalContributions } } } }`;
+				const gqlResponse: any = await this.postRequest('https://api.github.com/graphql', JSON.stringify({ query: contribQuery }), {
+					'Authorization': `Bearer ${token}`,
+					'Content-Type': 'application/json',
+					'User-Agent': 'VSCode-Gitsy',
+					'Accept': 'application/json'
+				});
+				contributions = gqlResponse?.data?.viewer?.contributionsCollection?.contributionCalendar?.totalContributions || 0;
+			} catch {
+				Logger.debug('Could not fetch contributions (non-critical)');
+			}
+
+			const profile = {
+				login: user.login,
+				name: user.name || user.login,
+				email: email || 'No public email',
+				avatarUrl: user.avatar_url || '',
+				repositories: { totalCount: user.public_repos || 0 },
+				contributionsCollection: { contributionCalendar: { totalContributions: contributions } }
+			};
+
+			Logger.info('User profile fetched successfully', { login: profile.login });
+			return profile;
 		} catch (e: any) {
 			Logger.error('Failed to fetch user profile', e);
 			throw new Error(`Failed to fetch user profile: ${e.message}`);
@@ -71,26 +111,45 @@ export class AuthService {
 	}
 
     public async getUserRepos(token: string): Promise<any[]> {
-        // Fetch user's repositories (first 100)
-        try {
-            const response: any = await this.makeRequest('https://api.github.com/user/repos?per_page=100&sort=updated&type=owner', 'GET', null, {
-                'Authorization': `Bearer ${token}`,
-                'User-Agent': 'VSCode-GitWise',
-                'Accept': 'application/vnd.github.v3+json'
-            });
+        // Fetch ALL user's repositories with pagination
+        const allRepos: any[] = [];
+        let page = 1;
+        const perPage = 100;
+        const maxPages = 10; // Safety limit: 1000 repos max
 
-            if (Array.isArray(response)) {
-                return response.map((repo: any) => ({
-                    name: repo.name,
-                    full_name: repo.full_name,
-                    html_url: repo.html_url,
-                    ssh_url: repo.ssh_url,
-                    clone_url: repo.clone_url,
-                    private: repo.private
-                }));
+        try {
+            while (page <= maxPages) {
+                const url = `https://api.github.com/user/repos?per_page=${perPage}&sort=updated&type=owner&page=${page}`;
+                const response: any = await this.makeRequest(url, 'GET', null, {
+                    'Authorization': `Bearer ${token}`,
+                    'User-Agent': 'VSCode-Gitsy',
+                    'Accept': 'application/vnd.github.v3+json'
+                });
+
+                if (!Array.isArray(response) || response.length === 0) {
+                    break;
+                }
+
+                allRepos.push(...response);
+
+                if (response.length < perPage) {
+                    break; // Last page
+                }
+                page++;
             }
-            return [];
+
+            Logger.info(`Fetched ${allRepos.length} repos across ${page} page(s)`);
+
+            return allRepos.map((repo: any) => ({
+                name: repo.name,
+                full_name: repo.full_name,
+                html_url: repo.html_url,
+                ssh_url: repo.ssh_url,
+                clone_url: repo.clone_url,
+                private: repo.private
+            }));
         } catch (e: any) {
+            Logger.error('Failed to fetch repos', e);
             throw new Error(`Failed to fetch repos: ${e.message}`);
         }
     }
@@ -105,7 +164,7 @@ export class AuthService {
 
         const response: any = await this.postRequest('https://api.github.com/user/repos', body, {
             'Authorization': `Bearer ${token}`,
-            'User-Agent': 'VSCode-GitWise',
+            'User-Agent': 'VSCode-Gitsy',
             'Content-Type': 'application/json',
             'Accept': 'application/vnd.github.v3+json'
         });
@@ -124,26 +183,43 @@ export class AuthService {
     }
 
     public async getRepoBranches(token: string, owner: string, repo: string): Promise<string[]> {
-        try {
-            const response: any = await this.makeRequest(`https://api.github.com/repos/${owner}/${repo}/branches`, 'GET', null, {
-                'Authorization': `Bearer ${token}`,
-                'User-Agent': 'VSCode-GitWise',
-                'Accept': 'application/vnd.github.v3+json'
-            });
+        // Fetch ALL branches with pagination
+        const allBranches: string[] = [];
+        let page = 1;
+        const perPage = 100;
 
-            if (Array.isArray(response)) {
-                return response.map((branch: any) => branch.name);
+        try {
+            while (page <= 5) {
+                const url = `https://api.github.com/repos/${owner}/${repo}/branches?per_page=${perPage}&page=${page}`;
+                const response: any = await this.makeRequest(url, 'GET', null, {
+                    'Authorization': `Bearer ${token}`,
+                    'User-Agent': 'VSCode-Gitsy',
+                    'Accept': 'application/vnd.github.v3+json'
+                });
+
+                if (!Array.isArray(response) || response.length === 0) {
+                    break;
+                }
+
+                allBranches.push(...response.map((branch: any) => branch.name));
+
+                if (response.length < perPage) {
+                    break;
+                }
+                page++;
             }
-            return [];
+
+            return allBranches;
         } catch (e) {
+            Logger.warn('Failed to fetch branches from GitHub API', { error: e, owner, repo });
             return [];
         }
     }
 
     public async getPullRequests(token: string, owner: string, repo: string): Promise<any[]> {
         const query = `
-        query {
-            repository(owner: "${owner}", name: "${repo}") {
+        query($owner: String!, $repo: String!) {
+            repository(owner: $owner, name: $repo) {
                 pullRequests(first: 10, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
                     nodes {
                         title
@@ -161,10 +237,10 @@ export class AuthService {
         }`;
 
         try {
-            const response: any = await this.postRequest('https://api.github.com/graphql', JSON.stringify({ query }), {
+            const response: any = await this.postRequest('https://api.github.com/graphql', JSON.stringify({ query, variables: { owner, repo } }), {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
-                'User-Agent': 'VSCode-GitWise'
+                'User-Agent': 'VSCode-Gitsy'
             });
             return response?.data?.repository?.pullRequests?.nodes || [];
         } catch (e) {
@@ -175,9 +251,9 @@ export class AuthService {
 
     public async getCommitStatus(token: string, owner: string, repo: string, branch: string): Promise<string | null> {
         const query = `
-        query {
-            repository(owner: "${owner}", name: "${repo}") {
-                object(expression: "${branch}") {
+        query($owner: String!, $repo: String!, $branch: String!) {
+            repository(owner: $owner, name: $repo) {
+                object(expression: $branch) {
                     ... on Commit {
                         statusCheckRollup {
                             state
@@ -187,10 +263,10 @@ export class AuthService {
             }
         }`;
         try {
-            const response: any = await this.postRequest('https://api.github.com/graphql', JSON.stringify({ query }), {
+            const response: any = await this.postRequest('https://api.github.com/graphql', JSON.stringify({ query, variables: { owner, repo, branch } }), {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
-                'User-Agent': 'VSCode-GitWise'
+                'User-Agent': 'VSCode-Gitsy'
             });
             return response?.data?.repository?.object?.statusCheckRollup?.state || null;
         } catch (e) {
@@ -203,7 +279,7 @@ export class AuthService {
         try {
             await this.makeRequest(url, 'DELETE', null, {
                 'Authorization': `Bearer ${token}`,
-                'User-Agent': 'VSCode-GitWise',
+                'User-Agent': 'VSCode-Gitsy',
                 'Accept': 'application/vnd.github.v3+json'
             });
             return true;
@@ -220,7 +296,7 @@ export class AuthService {
 
         const response = await this.makeRequest(url, 'PUT', body, {
             'Authorization': `Bearer ${token}`,
-            'User-Agent': 'VSCode-GitWise',
+            'User-Agent': 'VSCode-Gitsy',
             'Accept': 'application/vnd.github.v3+json',
             'Content-Type': 'application/json'
         });
@@ -236,27 +312,65 @@ export class AuthService {
         return this.makeRequest(url, 'POST', body, headers);
     }
 
-    private makeRequest(url: string, method: string, body: any, headers: any = {}): Promise<any> {
+    /**
+     * Make an HTTP request through the serial queue with retry logic.
+     * The queue ensures at most 2 concurrent requests to prevent TLS flooding.
+     */
+    private async makeRequest(url: string, method: string, body: any, headers: any = {}, retries = 3): Promise<any> {
+        return requestQueue.enqueue(() => this._makeRequestWithRetry(url, method, body, headers, retries));
+    }
+
+    private async _makeRequestWithRetry(url: string, method: string, body: any, headers: any, retries: number): Promise<any> {
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                const result = await this._doRequest(url, method, body, { ...headers });
+                return result;
+            } catch (e: any) {
+                lastError = e;
+                const isRetryable = /ECONNRESET|ETIMEDOUT|ENOTFOUND|EPIPE|socket hang up|TLS|disconnected/i.test(e.message);
+
+                if (isRetryable && attempt < retries) {
+                    const delay = attempt * 1500; // 1.5s, 3s backoff
+                    Logger.warn(`Request failed (attempt ${attempt}/${retries}), retrying in ${delay}ms`, { url, error: e.message });
+                    await new Promise(r => setTimeout(r, delay));
+                } else {
+                    break;
+                }
+            }
+        }
+
+        throw lastError || new Error('Request failed');
+    }
+
+    private _doRequest(url: string, method: string, body: any, headers: any): Promise<any> {
         return new Promise((resolve, reject) => {
             const urlObj = new URL(url);
-            const options = {
+
+            let bodyStr: string | undefined;
+            if (body) {
+                bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
+                headers['Content-Length'] = Buffer.byteLength(bodyStr, 'utf8').toString();
+            }
+
+            // Create a fresh agent per request — no persistent sockets that can go stale
+            const options: https.RequestOptions = {
                 hostname: urlObj.hostname,
                 path: urlObj.pathname + urlObj.search,
                 method: method,
                 headers: headers,
-                timeout: 30000 // 30 second timeout
+                timeout: 30000
             };
 
             Logger.debug('Making HTTP request', { method, url });
 
-            const req = https.request(options, (res: any) => {
+            const req = https.request(options, (res) => {
                 let data = '';
-                res.on('data', (chunk: any) => {
-                    data += chunk;
-                });
+                res.on('data', (chunk) => { data += chunk; });
                 res.on('end', () => {
                     try {
-                        if (!data || data.toString().trim() === '') {
+                        if (!data || data.trim() === '') {
                             resolve(null);
                             return;
                         }
@@ -268,9 +382,12 @@ export class AuthService {
                         }
                         resolve(parsed);
                     } catch (e) {
-                        Logger.error('Failed to parse response', e, { data });
+                        Logger.error('Failed to parse response', e, { data: data.substring(0, 200) });
                         reject(e);
                     }
+                });
+                res.on('error', (e) => {
+                    reject(e);
                 });
             });
 
@@ -285,8 +402,8 @@ export class AuthService {
                 reject(e);
             });
 
-            if (body) {
-                req.write(body.toString());
+            if (bodyStr) {
+                req.write(bodyStr);
             }
             req.end();
         });

@@ -1,4 +1,4 @@
-# ChatGPT + Git Helper Instructions
+# Gitsy Instructions
 
 - [x] Verify that the copilot-instructions.md file in the .github directory is created.
 - [x] Clarify Project Requirements
@@ -10,5 +10,5 @@
 - [x] Launch the Project
 - [x] Ensure Documentation is Complete
 
-This project is a VS Code extension that integrates Git operations with AI assistance.
-It uses a Sidebar WebView for the UI and supports custom API providers like GLM and Grok.
+This project is a VS Code extension that integrates Git operations with GitHub.
+It uses a Sidebar WebView for the UI.

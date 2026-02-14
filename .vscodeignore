@@ -12,3 +12,12 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+.history/**
+**/*.vsix
+**/*.vsix.backup
+**/*.zip
+nul
+**/nul
+.git/**
+.github/**
+CHANGELOG.md

@@ -5,7 +5,7 @@ export class Logger {
 
     public static initialize() {
         if (!this.outputChannel) {
-            this.outputChannel = vscode.window.createOutputChannel('GitWise');
+            this.outputChannel = vscode.window.createOutputChannel('Gitsy');
         }
     }
 

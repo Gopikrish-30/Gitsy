@@ -330,13 +330,19 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            transition: background-color 0.2s;
+            transition: background-color 0.2s, opacity 0.2s;
             margin-bottom: 16px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .primary-btn:hover {
             background-color: var(--accent-hover);
+        }
+
+        .primary-btn:disabled, .secondary-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         .action-grid {
@@ -845,14 +851,21 @@
 
 <body>
 
+    <!-- Loading State (shown until auth is determined) -->
+    <div id="loading-view" style="display:flex; align-items:center; justify-content:center; height:100vh; flex-direction:column; gap:12px;">
+        <div style="width:28px; height:28px; border:3px solid var(--text-secondary); border-top-color:var(--button-blue); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+        <span style="color:var(--text-secondary); font-size:0.85em;">Loading Gitsy...</span>
+    </div>
+    <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+
     <!-- Setup View -->
-    <div id="setup-view" class="setup-container">
-        <div class="setup-logo-container">
-            <div style="font-size: 36px;">🚀</div>
+    <div id="setup-view" class="setup-container" style="display:none;">
+        <div class="setup-logo-container" style="display: flex; flex-direction: column; align-items: center; background: none; box-shadow: none; width: auto; height: auto;">
+            <img src="{{logoUri}}" alt="Gitsy" style="width: 200px; height: 200px; margin-bottom: 0px;" />
+            <div class="setup-title" style="margin-top: -10px; font-size: 1.25em;">Gitsy</div>
         </div>
-        <div class="setup-title">GitWise</div>
         <div class="setup-desc">
-            AI-powered Git management for modern developers. Connect your GitHub account to get started.
+            Smart Git management for modern developers. Connect your GitHub account to get started.
         </div>
 
         <button class="auth-btn" onclick="connectGitHub()">
@@ -880,7 +893,6 @@
     <div id="main-view" style="display: none;">
         <div class="tab-nav">
             <button class="tab-link active" onclick="openTab('dashboard')">Dashboard</button>
-            <button class="tab-link" onclick="openTab('chat')">Chat</button>
         </div>
 
         <!-- Dashboard Tab -->
@@ -891,10 +903,10 @@
 
             <!-- Profile -->
             <div class="profile-card">
-                <div class="profile-avatar" id="user-avatar">?</div>
+                <div class="profile-avatar" id="user-avatar">...</div>
                 <div class="profile-info">
-                    <span class="profile-name" id="user-name">Guest</span>
-                    <span class="profile-email" id="user-email">Not logged in</span>
+                    <span class="profile-name" id="user-name">Loading...</span>
+                    <span class="profile-email" id="user-email">Loading...</span>
                 </div>
                 <button class="profile-settings-btn" onclick="openTab('profile')" title="Settings">⚙️</button>
             </div>
@@ -905,7 +917,7 @@
                 <div style="margin-bottom: 12px;">
                     <span class="repo-label" style="display:block; margin-bottom:4px;">Repo Name</span>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span id="repo-name" style="font-size:1.1em; font-weight:600;">No Repository</span>
+                        <span id="repo-name" style="font-size:1.1em; font-weight:600;">Loading...</span>
                         <span class="copy-btn" title="Copy Name" onclick="copyToClipboard('repo-name')">❐</span>
                     </div>
                 </div>
@@ -999,30 +1011,6 @@
 
         </div>
 
-        <!-- Chat Tab -->
-        <div id="chat" class="tab-content" style="height: 100vh; padding: 0; box-sizing: border-box;">
-
-            <div class="chat-container">
-                <div id="chat-history">
-                    <div class="chat-placeholder">
-                        <div style="font-size: 24px; margin-bottom: 10px;">⚡</div>
-                        <div>Ask anything (Ctrl+L)</div>
-                    </div>
-                </div>
-
-                <div class="chat-input-area">
-                    <button class="icon-btn" title="Add Attachment">+</button>
-
-                    <div class="chat-input-wrapper">
-                        <textarea id="chat-input" rows="1" placeholder="Ask anything..."
-                            oninput="this.style.height = ''; this.style.height = Math.min(this.scrollHeight, 120) + 'px'"></textarea>
-                        <button class="icon-btn" title="Voice Mode" style="margin-left:4px;">🎤</button>
-                        <button class="send-btn-mini" onclick="sendChat()" style="margin-left:4px;">➔</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Profile/Settings Tab -->
         <div id="profile" class="tab-content">
             <div style="margin-bottom: 20px;">
@@ -1037,32 +1025,11 @@
                 </div>
             </div>
 
-            <!-- Settings Form -->
-            <div class="section-header" style="margin-top:20px;">Settings</div>
+            <!-- Account Section -->
+            <div class="section-header" style="margin-top:20px;">Account</div>
+            <p style="font-size:0.85em; color:var(--text-secondary); margin:8px 0 16px 0;">Authenticated via GitHub OAuth. Your token is managed securely by VS Code.</p>
 
-            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">API
-                Provider</label>
-            <select id="settings-provider" class="input">
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="ollama">Ollama</option>
-            </select>
-
-            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Base URL</label>
-            <input type="text" id="settings-base-url" class="input" placeholder="e.g. https://api.openai.com/v1">
-
-            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">Model Name</label>
-            <input type="text" id="settings-model" class="input" placeholder="e.g. gpt-4o">
-
-            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">API Key</label>
-            <input type="password" id="settings-api-key" class="input" placeholder="••••••••">
-
-            <label class="form-label" style="display:block; margin-bottom:4px; font-weight:600;">GitHub PAT</label>
-            <input type="password" id="settings-pat" class="input" placeholder="••••••••">
-
-            <button class="primary-btn" onclick="saveSettings()">Save Settings</button>
-
-            <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:20px;">
+            <div style="border-top:1px solid var(--border-color); padding-top:20px;">
                 <button class="primary-btn" style="background-color: var(--error);"
                     onclick="logoutGitHub()">Logout</button>
             </div>
@@ -1184,22 +1151,30 @@
                 }
             });
 
-            if (tabName === 'profile') {
-                vscode.postMessage({ type: 'get-settings' });
-            }
         }
 
         function copyToClipboard(elementId) {
             const el = document.getElementById(elementId);
             if (!el) return;
             const text = el.innerText;
-            const area = document.createElement('textarea');
-            area.value = text;
-            document.body.appendChild(area);
-            area.select();
-            document.execCommand('copy');
-            document.body.removeChild(area);
-            vscode.postMessage({ type: 'onInfo', value: 'Copied!' });
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    vscode.postMessage({ type: 'onInfo', value: 'Copied!' });
+                }).catch(() => {
+                    vscode.postMessage({ type: 'onError', value: 'Failed to copy' });
+                });
+            } else {
+                // Fallback for older environments
+                const area = document.createElement('textarea');
+                area.value = text;
+                area.style.position = 'fixed';
+                area.style.opacity = '0';
+                document.body.appendChild(area);
+                area.select();
+                document.execCommand('copy');
+                document.body.removeChild(area);
+                vscode.postMessage({ type: 'onInfo', value: 'Copied!' });
+            }
         }
 
         /* --- Actions --- */
@@ -1207,7 +1182,17 @@
         function logoutGitHub() { vscode.postMessage({ type: 'logout-github' }); }
         function refreshStats() { vscode.postMessage({ type: 'refresh-stats' }); }
 
+        function setDashboardButtonsDisabled(disabled) {
+            document.querySelectorAll('#dashboard .action-grid .secondary-btn').forEach(btn => {
+                btn.disabled = disabled;
+            });
+        }
+
         function gitAction(action, payload = {}) {
+            console.log('[Gitsy WebView] gitAction called:', action);
+            setDashboardButtonsDisabled(true);
+            // Safety: re-enable buttons after 90 seconds in case extension doesn't respond
+            setTimeout(() => setDashboardButtonsDisabled(false), 90000);
             vscode.postMessage({ type: 'git-action', action, payload });
         }
         function promptCommit() { gitAction('commit'); }
@@ -1215,37 +1200,6 @@
         function promptSwitchBranch() { gitAction('switch-branch'); }
         function promptMergeBranch() { gitAction('merge-branch'); }
         function promptDeleteBranch() { gitAction('delete-branch'); }
-
-        function sendChat() {
-            const input = document.getElementById('chat-input');
-            const value = input.value;
-            if (!value) return;
-            // Append user msg locally for instant feedback
-            addChatMessage({ role: 'user', content: value });
-            vscode.postMessage({ type: 'chat-query', value });
-            input.value = '';
-        }
-
-        function addChatMessage(msg) {
-            const history = document.getElementById('chat-history');
-            const div = document.createElement('div');
-            div.style.padding = '8px';
-            div.style.marginBottom = '8px';
-            div.style.borderRadius = '6px';
-            div.style.fontSize = '12px';
-
-            if (msg.role === 'user') {
-                div.style.background = 'var(--accent)';
-                div.style.color = 'white';
-                div.style.marginLeft = '20px';
-            } else {
-                div.style.background = 'var(--hover-bg)';
-                div.style.marginRight = '20px';
-            }
-            div.innerText = msg.content;
-            history.appendChild(div);
-            history.scrollTop = history.scrollHeight;
-        }
 
         /* --- Fast Push Modal Logic --- */
         function openFastPushModal() {
@@ -1347,8 +1301,8 @@
 
 
         function showPatLogin() {
-            document.getElementById('setup-view').style.display = 'none';
-            document.getElementById('pat-view').style.display = 'flex';
+            // PAT login removed — use GitHub OAuth instead
+            connectGitHub();
         }
         function showSetup() {
             document.getElementById('setup-view').style.display = 'flex';
@@ -1357,22 +1311,8 @@
 
 
         function saveSettings() {
-            const provider = document.getElementById('settings-provider').value;
-            const baseUrl = document.getElementById('settings-base-url').value;
-            const modelName = document.getElementById('settings-model').value;
-            const apiKey = document.getElementById('settings-api-key').value;
-            const pat = document.getElementById('settings-pat').value;
-
-            vscode.postMessage({
-                type: 'save-settings',
-                value: {
-                    provider,
-                    baseUrl,
-                    modelName,
-                    apiKey,
-                    pat
-                }
-            });
+            // Settings managed via OAuth — nothing to save manually
+            vscode.postMessage({ type: 'onInfo', value: 'Settings managed via GitHub OAuth.' });
         }
 
         /* --- Event Listener --- */
@@ -1380,13 +1320,9 @@
             const message = event.data;
             const type = message.type;
             const value = message.value;
+            console.log('[Gitsy WebView] Message from extension:', type);
 
             switch (type) {
-                case 'populate-settings':
-                    if (value.provider) document.getElementById('settings-provider').value = value.provider;
-                    if (value.baseUrl) document.getElementById('settings-base-url').value = value.baseUrl;
-                    if (value.modelName) document.getElementById('settings-model').value = value.modelName;
-                    break;
                 case 'set-loading':
                     const btn = document.querySelector('#setup-view .auth-btn');
                     const helpText = document.getElementById('auth-help');
@@ -1406,11 +1342,34 @@
                     }
                     break;
                 case 'show-dashboard':
+                    document.getElementById('loading-view').style.display = 'none';
                     document.getElementById('setup-view').style.display = 'none';
                     document.getElementById('main-view').style.display = 'block';
                     break;
+                case 'show-setup':
+                    document.getElementById('loading-view').style.display = 'none';
                     document.getElementById('setup-view').style.display = 'flex';
                     document.getElementById('main-view').style.display = 'none';
+                    break;
+                case 'update-user-quick':
+                    // Instant profile display — shows user info immediately without waiting for full stats
+                    if (value) {
+                        const avatarEl = document.getElementById('user-avatar');
+                        const nameEl = document.getElementById('user-name');
+                        const emailEl = document.getElementById('user-email');
+                        if (nameEl && value.name) nameEl.innerText = value.name;
+                        if (emailEl) emailEl.innerText = value.email || 'Authenticated';
+                        if (avatarEl && value.avatar) {
+                            avatarEl.innerText = '';
+                            avatarEl.style.backgroundImage = "url('" + value.avatar + "')";
+                            avatarEl.style.backgroundSize = 'cover';
+                            avatarEl.style.backgroundPosition = 'center';
+                        } else if (avatarEl && value.name) {
+                            avatarEl.innerText = value.name.charAt(0).toUpperCase();
+                        } else if (avatarEl && value.login) {
+                            avatarEl.innerText = value.login.charAt(0).toUpperCase();
+                        }
+                    }
                     break;
 
                 case 'update-stats':
@@ -1499,20 +1458,48 @@
                             value.pullRequests.forEach(pr => {
                                 const d = document.createElement('div');
                                 d.className = 'pr-item';
-                                // separate click for main body vs buttons
-                                d.innerHTML = `
-                                    <div onclick="vscode.postMessage({ type: 'open-external', value: '${pr.url}' })" style="flex:1;">
-                                        <div class="pr-title">#${pr.number} ${pr.title}</div>
-                                        <div class="pr-meta">
-                                            <span>by ${pr.author.login}</span>
-                                            <span>${new Date(pr.createdAt).toLocaleDateString()}</span>
-                                        </div>
-                                    </div>
-                                    <div class="pr-actions">
-                                        <button class="pr-action-btn" title="Checkout Locally" onclick="checkoutPR(${pr.number})">⬇️</button>
-                                        <button class="pr-action-btn" title="Merge PR" onclick="mergePR(${pr.number})">🔀</button>
-                                    </div>
-                                `;
+
+                                // Build PR item safely (no innerHTML to prevent XSS)
+                                const prBody = document.createElement('div');
+                                prBody.style.flex = '1';
+                                prBody.style.cursor = 'pointer';
+                                prBody.addEventListener('click', () => {
+                                    vscode.postMessage({ type: 'open-external', value: pr.url });
+                                });
+
+                                const prTitle = document.createElement('div');
+                                prTitle.className = 'pr-title';
+                                prTitle.textContent = '#' + pr.number + ' ' + pr.title;
+
+                                const prMeta = document.createElement('div');
+                                prMeta.className = 'pr-meta';
+                                const authorSpan = document.createElement('span');
+                                authorSpan.textContent = 'by ' + (pr.author ? pr.author.login : 'unknown');
+                                const dateSpan = document.createElement('span');
+                                dateSpan.textContent = new Date(pr.createdAt).toLocaleDateString();
+                                prMeta.appendChild(authorSpan);
+                                prMeta.appendChild(dateSpan);
+
+                                prBody.appendChild(prTitle);
+                                prBody.appendChild(prMeta);
+
+                                const prActions = document.createElement('div');
+                                prActions.className = 'pr-actions';
+                                const checkoutBtn = document.createElement('button');
+                                checkoutBtn.className = 'pr-action-btn';
+                                checkoutBtn.title = 'Checkout Locally';
+                                checkoutBtn.textContent = '⬇️';
+                                checkoutBtn.addEventListener('click', () => checkoutPR(pr.number));
+                                const mergeBtn = document.createElement('button');
+                                mergeBtn.className = 'pr-action-btn';
+                                mergeBtn.title = 'Merge PR';
+                                mergeBtn.textContent = '🔀';
+                                mergeBtn.addEventListener('click', () => mergePR(pr.number));
+                                prActions.appendChild(checkoutBtn);
+                                prActions.appendChild(mergeBtn);
+
+                                d.appendChild(prBody);
+                                d.appendChild(prActions);
                                 prList.appendChild(d);
                             });
                         } else {
@@ -1563,13 +1550,23 @@
                         list.innerHTML = '<div style="padding:10px; color:var(--text-secondary); text-align:center;">No changes</div>';
                     }
                     break;
-                case 'add-chat-message':
-                    addChatMessage(value);
-                    break;
                 case 'github-connected':
                     // Switch to dashboard
+                    document.getElementById('loading-view').style.display = 'none';
                     document.getElementById('setup-view').style.display = 'none';
                     document.getElementById('main-view').style.display = 'block';
+                    break;
+                case 'error':
+                    // Forward backend errors to VS Code notification
+                    if (value) {
+                        vscode.postMessage({ type: 'onError', value: value });
+                    }
+                    break;
+                case 'action-started':
+                    setDashboardButtonsDisabled(true);
+                    break;
+                case 'action-finished':
+                    setDashboardButtonsDisabled(false);
                     break;
                 case 'update-repos':
                     const sel = document.getElementById('fp-repo-select');
@@ -1656,63 +1653,6 @@
         function mergePR(prNumber) {
             vscode.postMessage({ type: 'pr-merge', value: { prNumber } });
         }
-
-        /* --- Chat Functions --- */
-        /* --- Chat Functions --- */
-        function addChatMessage(msg) {
-            const history = document.getElementById('chat-history');
-
-            // Remove placeholder if exists
-            const placeholder = history.querySelector('.chat-placeholder');
-            if (placeholder) {
-                placeholder.remove();
-            }
-
-            const row = document.createElement('div');
-            row.className = `message-row ${msg.role}`;
-
-            if (msg.role === 'user') {
-                // User: Just simple text block, right aligned
-                const bubble = document.createElement('div');
-                bubble.className = `message-bubble user`;
-                bubble.innerText = msg.content;
-                row.appendChild(bubble);
-            } else {
-                // Assistant: Card style
-                const bubble = document.createElement('div');
-                bubble.className = `message-bubble assistant`;
-
-                // If content has headers, we can try to separate them into "cards" visually
-                // For now, let's wrap it in a card container if it's long, or just text
-                // Simple parsing: if it starts with "Active Task" or similar, use card style
-
-                // For this mock, we just dump content, but in future can parse "Thoughts", "Tasks"
-                const contentHtml = msg.content.replace(/\n/g, '<br>');
-
-                // Check if it's a structural update (visual hack for demo)
-                if (msg.content.includes('Task:') || msg.content.includes('Files Edited')) {
-                    const card = document.createElement('div');
-                    card.className = 'agent-card';
-                    card.innerHTML = `<div class="agent-card-title">⚡ Update</div><div>${contentHtml}</div>`;
-                    bubble.appendChild(card);
-                } else {
-                    bubble.innerHTML = contentHtml;
-                }
-
-                row.appendChild(bubble);
-            }
-
-            history.appendChild(row);
-            history.scrollTop = history.scrollHeight;
-        }
-
-        // Handle Enter key in chat input
-        document.getElementById('chat-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendChat();
-            }
-        });
     </script>
 </body>
 

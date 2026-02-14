@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { GitService } from './gitService';
+import { GitService, FastPushIssue } from './gitService';
 import { AuthService } from './authService';
 import { Logger } from './logger';
 import { Cache } from './cache';
+import { parseGitHubUrl } from './utils';
 
 export class GitOperations {
     private branchCache = new Cache<string[]>(300); // 5 min cache
@@ -18,23 +19,28 @@ export class GitOperations {
             return undefined;
         }
 
+        // Try to resolve workspace folder from active editor
         const editor = vscode.window.activeTextEditor;
         if (editor?.document?.uri?.fsPath) {
-            try {
-                const fileDir = require('path').dirname(editor.document.uri.fsPath);
-                const gs = new GitService(fileDir);
-                if (await gs.isRepo()) {
-                    return fileDir;
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+            if (workspaceFolder) {
+                try {
+                    const gs = new GitService(workspaceFolder.uri.fsPath);
+                    if (await gs.isRepo()) {
+                        return workspaceFolder.uri.fsPath;
+                    }
+                } catch (e) {
+                    Logger.debug('Active editor workspace folder not a git repo', { error: e });
                 }
-            } catch (e) {
-                Logger.debug('Active editor file not in a git repo', { error: e });
             }
         }
 
+        // Single workspace — use it directly
         if (vscode.workspace.workspaceFolders.length === 1) {
             return vscode.workspace.workspaceFolders[0].uri.fsPath;
         }
 
+        // Multi-root workspace — prompt user to pick
         const items = vscode.workspace.workspaceFolders.map(folder => ({
             label: folder.name,
             description: folder.uri.fsPath,
@@ -119,9 +125,218 @@ export class GitOperations {
         if (!fpMsg) {
             throw new Error('Commit message required');
         }
+
+        // ── Pre-flight diagnostics ──
+        const issues = await gitService.diagnoseFastPushIssues();
+        if (issues.length > 0) {
+            const resolved = await this.resolveIssuesInteractively(gitService, issues);
+            if (!resolved) {
+                throw new Error('Fast Push cancelled — unresolved issues remain.');
+            }
+        }
+
+        // ── Stage all files ──
         await gitService.addAll();
-        await gitService.commit(fpMsg);
-        return await gitService.push();
+
+        // ── Commit (tolerate nothing-to-commit) ──
+        try {
+            await gitService.commit(fpMsg);
+        } catch (e: any) {
+            const msg = e.message || '';
+            if (msg.includes('nothing to commit') || msg.includes('working tree clean') || msg.includes('no changes added to commit') || msg.includes('nothing added to commit')) {
+                Logger.info('Nothing new to commit, proceeding to push');
+            } else {
+                throw e;
+            }
+        }
+
+        // ── Push (handle push-specific failures) ──
+        try {
+            return await gitService.push();
+        } catch (pushErr: any) {
+            const pushMsg = pushErr.message || '';
+            // If push fails because we're behind, offer to pull --rebase and retry
+            if (pushMsg.includes('rejected') || pushMsg.includes('non-fast-forward') || pushMsg.includes('fetch first') || pushMsg.includes('failed to push')) {
+                const pullFirst = await vscode.window.showWarningMessage(
+                    'Push was rejected because the remote has newer commits. Pull with rebase and retry?',
+                    { modal: true, detail: 'This will replay your commits on top of the remote changes. Your work will not be lost.' },
+                    'Pull & Retry', 'Cancel'
+                );
+                if (pullFirst === 'Pull & Retry') {
+                    await gitService.pullRebase();
+                    return await gitService.push();
+                }
+            }
+            throw pushErr;
+        }
+    }
+
+    /**
+     * Present each issue to the user with an explanation + resolution options.
+     * Returns true if all issues were resolved or skipped, false if the user cancels.
+     */
+    private async resolveIssuesInteractively(gitService: GitService, issues: FastPushIssue[]): Promise<boolean> {
+        // Separate blocking issues from non-blocking
+        const blocking = issues.filter(i => !i.autoFixable);
+        const fixable = issues.filter(i => i.autoFixable);
+
+        // Show blocking issues first — user MUST handle these manually
+        for (const issue of blocking) {
+            const choice = await vscode.window.showWarningMessage(
+                `⚠️ ${issue.title}`,
+                {
+                    modal: true,
+                    detail: `${issue.description}\n\n💡 Solution: ${issue.resolution}`
+                },
+                'I Fixed It — Continue', 'Cancel Fast Push'
+            );
+            if (choice !== 'I Fixed It — Continue') {
+                return false;
+            }
+        }
+
+        // Handle auto-fixable issues with user confirmation
+        for (const issue of fixable) {
+            const resolved = await this.handleFixableIssue(gitService, issue);
+            if (!resolved) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Handle a single auto-fixable issue: explain, confirm, fix.
+     */
+    private async handleFixableIssue(gitService: GitService, issue: FastPushIssue): Promise<boolean> {
+        switch (issue.id) {
+            case 'no-repo': {
+                const choice = await vscode.window.showWarningMessage(
+                    `⚠️ ${issue.title}`,
+                    { modal: true, detail: `${issue.description}\n\n💡 Solution: ${issue.resolution}` },
+                    'Initialize Repository', 'Cancel'
+                );
+                if (choice === 'Initialize Repository') {
+                    await gitService.init();
+                    vscode.window.showInformationMessage('✅ Git repository initialized.');
+                    return true;
+                }
+                return false;
+            }
+
+            case 'no-remote': {
+                const url = await vscode.window.showInputBox({
+                    prompt: '⚠️ No remote URL configured. Enter the remote repository URL:',
+                    placeHolder: 'https://github.com/username/repo.git',
+                    ignoreFocusOut: true
+                });
+                if (url) {
+                    await gitService.setRemote(url);
+                    vscode.window.showInformationMessage('✅ Remote URL set.');
+                    return true;
+                }
+                return false;
+            }
+
+            case 'branches-diverged':
+            case 'behind-remote': {
+                const choice = await vscode.window.showWarningMessage(
+                    `⚠️ ${issue.title}`,
+                    { modal: true, detail: `${issue.description}\n\n💡 Solution: ${issue.resolution}` },
+                    'Pull with Rebase', 'Cancel'
+                );
+                if (choice === 'Pull with Rebase') {
+                    try {
+                        await gitService.pullRebase();
+                        vscode.window.showInformationMessage('✅ Pulled with rebase successfully.');
+                        return true;
+                    } catch (e: any) {
+                        vscode.window.showErrorMessage(`Pull --rebase failed: ${e.message}. Resolve conflicts manually.`);
+                        return false;
+                    }
+                }
+                return false;
+            }
+
+            case 'detached-head': {
+                const branchName = await vscode.window.showInputBox({
+                    prompt: '⚠️ You are in detached HEAD state. Enter a branch name to save your work:',
+                    placeHolder: 'my-branch',
+                    ignoreFocusOut: true
+                });
+                if (branchName) {
+                    await gitService.createBranchFromDetachedHead(branchName);
+                    vscode.window.showInformationMessage(`✅ Created and switched to branch '${branchName}'.`);
+                    return true;
+                }
+                return false;
+            }
+
+            case 'stale-lock': {
+                const choice = await vscode.window.showWarningMessage(
+                    `⚠️ ${issue.title}`,
+                    { modal: true, detail: `${issue.description}\n\n💡 Solution: ${issue.resolution}` },
+                    'Remove Lock File', 'Cancel'
+                );
+                if (choice === 'Remove Lock File') {
+                    const removed = await gitService.removeStaleLockFile();
+                    if (removed) {
+                        vscode.window.showInformationMessage('✅ Stale lock file removed.');
+                        return true;
+                    } else {
+                        vscode.window.showErrorMessage('Failed to remove lock file.');
+                        return false;
+                    }
+                }
+                return false;
+            }
+
+            case 'upstream-missing': {
+                const choice = await vscode.window.showWarningMessage(
+                    `⚠️ ${issue.title}`,
+                    { modal: true, detail: `${issue.description}\n\n💡 Solution: ${issue.resolution}` },
+                    'Continue — Push Will Create It', 'Cancel'
+                );
+                return choice === 'Continue — Push Will Create It';
+            }
+
+            case 'upstream-broken': {
+                const choice = await vscode.window.showWarningMessage(
+                    `⚠️ ${issue.title}`,
+                    { modal: true, detail: `${issue.description}\n\n💡 Solution: ${issue.resolution}` },
+                    'Fix Upstream Tracking', 'Cancel'
+                );
+                if (choice === 'Fix Upstream Tracking') {
+                    try {
+                        await gitService.fixUpstreamTracking();
+                        vscode.window.showInformationMessage('✅ Upstream tracking fixed.');
+                        return true;
+                    } catch (e: any) {
+                        vscode.window.showErrorMessage(`Failed to fix upstream: ${e.message}`);
+                        return false;
+                    }
+                }
+                return false;
+            }
+
+            case 'nothing-to-do': {
+                await vscode.window.showInformationMessage(
+                    'ℹ️ Nothing to push — your branch is clean and up to date with remote.',
+                    { modal: true }
+                );
+                return false;
+            }
+
+            default: {
+                const choice = await vscode.window.showWarningMessage(
+                    `⚠️ ${issue.title}`,
+                    { modal: true, detail: `${issue.description}\n\n💡 Solution: ${issue.resolution}` },
+                    'Continue Anyway', 'Cancel'
+                );
+                return choice === 'Continue Anyway';
+            }
+        }
     }
 
     private async handleStash(gitService: GitService): Promise<string> {
@@ -263,8 +478,8 @@ export class GitOperations {
 
         if (isRemote) {
             const remoteUrl = await gitService.getRemote();
-            const { owner, repo } = this.parseGitHubUrl(remoteUrl);
-            const token = await this.context.secrets.get("gitwise.githubPat");
+            const { owner, repo } = parseGitHubUrl(remoteUrl);
+            const token = await this.context.secrets.get("gitsy.githubPat");
 
             if (token && owner && repo) {
                 try {
@@ -314,7 +529,7 @@ export class GitOperations {
     }
 
     private async getGitHubBranches(gitService: GitService): Promise<string[]> {
-        const token = await this.context.secrets.get('gitwise.githubPat');
+        const token = await this.context.secrets.get('gitsy.githubPat');
         if (!token) {
             // Fallback to local git if no token
             return await gitService.getCurrentRepoBranches();
@@ -322,7 +537,7 @@ export class GitOperations {
 
         try {
             const remoteUrl = await gitService.getRemote();
-            const { owner, repo } = this.parseGitHubUrl(remoteUrl);
+            const { owner, repo } = parseGitHubUrl(remoteUrl);
             if (owner && repo) {
                 const branches = await this.authService.getRepoBranches(token, owner, repo);
                 if (branches && branches.length > 0) {
@@ -344,13 +559,13 @@ export class GitOperations {
             return cached;
         }
 
+        const token = await this.context.secrets.get('gitsy.githubPat');
         const gitService = new GitService(_repoPath);
-        const token = await this.context.secrets.get('gitwise.githubPat');
 
         try {
             const remoteUrl = await gitService.getRemote();
             if (token && remoteUrl) {
-                const { owner, repo } = this.parseGitHubUrl(remoteUrl);
+                const { owner, repo } = parseGitHubUrl(remoteUrl);
                 if (owner && repo) {
                     const branches = await this.authService.getRepoBranches(token, owner, repo);
                     if (branches && branches.length > 0) {
@@ -371,25 +586,6 @@ export class GitOperations {
             Logger.error('Failed to fetch branches', e);
             return [];
         }
-    }
-
-    private parseGitHubUrl(url: string): { owner: string; repo: string } {
-        let owner = '';
-        let repo = '';
-
-        if (url.startsWith('http')) {
-            const parts = url.split('/');
-            owner = parts[parts.length - 2] || '';
-            repo = (parts[parts.length - 1] || '').replace('.git', '');
-        } else if (url.startsWith('git@')) {
-            const parts = url.split(':');
-            const path = parts[1] || '';
-            const pathParts = path.split('/');
-            owner = pathParts[0] || '';
-            repo = (pathParts[1] || '').replace('.git', '');
-        }
-
-        return { owner, repo };
     }
 
     public clearCache(): void {

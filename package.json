@@ -1,13 +1,13 @@
 {
-  "name": "gitwise",
-  "displayName": "GitWise: AI Git Helper",
-  "publisher": "gitwise",
-  "description": "A VS Code extension for Git operations and ChatGPT assistance.",
+  "name": "gitsy",
+  "displayName": "Gitsy: Git Helper",
+  "publisher": "gitsy",
+  "description": "A VS Code extension for Git operations with GitHub integration.",
   "version": "0.0.1",
-  "icon": "media/icon.png",
+  "icon": "media/gitsy.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Gopikrish-30/GitWise.git"
+    "url": "https://github.com/Gopikrish-30/Gitsy.git"
   },
   "engines": {
     "vscode": "^1.106.1"
@@ -15,63 +15,32 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onView:gitHelperSidebar",
-    "*"
-  ],
+  "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "git-helper-sidebar",
-          "title": "Git Helper",
-          "icon": "media/icon.png"
+          "id": "gitsy-sidebar",
+          "title": "Gitsy",
+          "icon": "media/gitsy-icon.svg"
         }
       ]
     },
     "views": {
-      "git-helper-sidebar": [
+      "gitsy-sidebar": [
         {
           "type": "webview",
-          "id": "gitHelperSidebar",
-          "name": "Git Helper & Chat"
+          "id": "gitsySidebar",
+          "name": "Gitsy",
+          "icon": "media/gitsy-icon.svg"
         }
       ]
     },
-    "configuration": {
-      "title": "ChatGPT + Git Helper",
-      "properties": {
-        "gitHelper.apiProvider": {
-          "type": "string",
-          "default": "OpenAI",
-          "enum": ["OpenAI", "GLM", "Grok", "Other"],
-          "description": "Select the AI API Provider."
-        },
-        "gitHelper.apiBaseUrl": {
-          "type": "string",
-          "default": "https://api.openai.com/v1",
-          "description": "Base URL for the API (e.g., https://open.bigmodel.cn/api/paas/v4 for GLM)."
-        },
-        "gitHelper.modelName": {
-          "type": "string",
-          "default": "gpt-3.5-turbo",
-          "description": "Model name to use (e.g., glm-4, grok-1)."
-        }
-      }
-    },
     "commands": [
       {
-        "command": "chatgpt-git-helper.helloWorld",
-        "title": "Hello World"
-      },
-      {
-        "command": "chatgpt-git-helper.setApiKey",
-        "title": "Git Helper: Set API Key"
-      },
-      {
-        "command": "chatgpt-git-helper.setPat",
-        "title": "Git Helper: Set GitHub PAT"
+        "command": "gitsy.setPat",
+        "title": "Gitsy: Set GitHub PAT"
       }
     ]
   },
@@ -87,16 +56,16 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.106.1",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.46.3",
-    "eslint": "^9.39.1",
-    "typescript": "^5.9.3",
-    "ts-loader": "^9.5.4",
-    "webpack": "^5.102.1",
-    "webpack-cli": "^6.0.1",
+    "@types/vscode": "^1.106.1",
     "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.39.1",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.3",
+    "webpack": "^5.102.1",
+    "webpack-cli": "^6.0.1"
   }
 }

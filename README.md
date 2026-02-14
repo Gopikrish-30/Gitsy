@@ -1,16 +1,15 @@
-# GitWise: AI Git Helper for VS Code
+# Gitsy for VS Code
 
-![GitWise Logo](media/icon.png)
+![Gitsy Logo](media/gitsy.png)
 
-**GitWise** is a powerful VS Code extension that combines standard Git operations with AI-powered assistance. It streamlines your workflow by providing a modern sidebar interface for git commands and an integrated AI chat to answer your questions.
+**Gitsy** is a powerful VS Code extension that streamlines Git operations with GitHub integration. It provides a modern sidebar interface for managing your repositories, branches, and everyday Git workflows.
 
 ## 🚀 Features
 
-*   **🤖 AI-Powered Chat**: Ask questions about Git, your code, or get help with errors using OpenAI, GLM, or Grok.
 *   **⚡ Fast Push**: One-click workflow to Stage All -> Commit -> Push.
 *   **📊 Dashboard**: View repository status, current branch, and remote details at a glance.
 *   **🌿 Branch Management**: Create, switch, merge, and delete branches directly from the sidebar.
-*   **🔒 Secure**: Your API keys and Personal Access Tokens (PAT) are stored securely using VS Code's Secret Storage.
+*   **🔒 Secure**: Your Personal Access Tokens (PAT) are stored securely using VS Code's Secret Storage.
 *   **🛠️ Git Operations**:
     *   Commit, Push, Pull, Fetch
     *   Stash changes
@@ -20,19 +19,15 @@
 
 1.  Open **VS Code**.
 2.  Go to the **Extensions** view (`Ctrl+Shift+X`).
-3.  Search for **GitWise**.
+3.  Search for **Gitsy**.
 4.  Click **Install**.
 
 ## ⚙️ Setup
 
-1.  **Open the Sidebar**: Click the GitWise icon in the Activity Bar.
+1.  **Open the Sidebar**: Click the Gitsy icon in the Activity Bar.
 2.  **Connect GitHub**:
     *   Click "Login with GitHub" to authenticate securely.
     *   Or manually enter a Personal Access Token (PAT).
-3.  **Configure AI**:
-    *   Select your provider (OpenAI, GLM, Grok).
-    *   Enter your API Key.
-    *   (Optional) Set a custom Base URL and Model Name.
 
 ## 📖 Usage
 
@@ -41,19 +36,6 @@ The dashboard provides a quick overview of your repository:
 *   **Repo Info**: Name, path, and remote URL.
 *   **Status**: Clean or dirty working tree.
 *   **Sync**: Quick buttons for Pull, Push, Commit, and Stash.
-
-### AI Chat
-Switch to the **Chat** tab to interact with the AI.
-*   *Example*: "How do I undo the last commit?"
-*   *Example*: "Explain the changes in this file."
-
-## 🔧 Configuration
-
-You can configure the extension via the Settings UI or `settings.json`:
-
-*   `gitHelper.apiProvider`: AI Provider (Default: `OpenAI`)
-*   `gitHelper.apiBaseUrl`: Custom API Base URL.
-*   `gitHelper.modelName`: Model to use (e.g., `gpt-3.5-turbo`).
 
 ## 🤝 Contributing
 
@@ -70,4 +52,4 @@ Contributions are welcome!
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
-**Publisher**: [gitwise](https://marketplace.visualstudio.com/publishers/gitwise)
+**Publisher**: [gitsy](https://marketplace.visualstudio.com/publishers/gitsy)

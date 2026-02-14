@@ -1,9 +1,9 @@
 # Change Log
 
-All notable changes to the "chatgpt-git-helper" extension will be documented in this file.
+All notable changes to the "Gitsy" extension will be documented in this file.
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
-
-## [Unreleased]
-
-- Initial release
+## [0.0.1] - 2026-02-14
+- Initial release of Gitsy: Git Helper
+- Authentication with GitHub
+- Sidebar Dashboard
+- Fast Push functionality
