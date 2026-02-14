@@ -288,6 +288,14 @@ export class MessageHandler {
 
                     // ── Step 2: Create remote repo / set remote ──
                     let remoteUrl = payload.repoUrl;
+
+                    // Validate branch name — reject loading placeholders
+                    let branch = payload.branch;
+                    if (!branch || branch === 'Loading...' || branch.startsWith('Loading') || !/^[a-zA-Z0-9_\/-]+$/.test(branch)) {
+                        Logger.warn('Invalid branch name received, defaulting to main', { branch });
+                        branch = 'main';
+                    }
+
                     if (payload.repoType === 'new') {
                         if (!token) {
                             throw new Error("GitHub login required to create repo");
@@ -323,13 +331,13 @@ export class MessageHandler {
                     // ── Step 4: Switch branch if needed ──
                     if (hasCommits) {
                         const currentBranch = await gitService.getCurrentBranch();
-                        if (currentBranch !== payload.branch) {
-                            progress.report({ message: `Switching to branch ${payload.branch}...` });
-                            const hasLocal = await gitService.hasLocalBranch(payload.branch);
+                        if (currentBranch !== branch) {
+                            progress.report({ message: `Switching to branch ${branch}...` });
+                            const hasLocal = await gitService.hasLocalBranch(branch);
                             if (!hasLocal) {
-                                await gitService.createBranch(payload.branch);
+                                await gitService.createBranch(branch);
                             } else {
-                                await gitService.switchBranch(payload.branch);
+                                await gitService.switchBranch(branch);
                             }
                         }
                     }
@@ -338,8 +346,14 @@ export class MessageHandler {
                     progress.report({ message: 'Running pre-flight checks...' });
                     const issues = await gitService.diagnoseFastPushIssues();
 
-                    // Filter out no-repo / no-remote since we handled those above already
-                    const relevantIssues = issues.filter(i => i.id !== 'no-repo' && i.id !== 'no-remote');
+                    // Filter out issues already handled above + false positives for new repos
+                    const relevantIssues = issues.filter(i => {
+                        // Already handled by steps above
+                        if (i.id === 'no-repo' || i.id === 'no-remote') { return false; }
+                        // For brand new repos (no commits), these are expected — not real issues
+                        if (!hasCommits && (i.id === 'detached-head' || i.id === 'upstream-missing' || i.id === 'upstream-broken' || i.id === 'nothing-to-do')) { return false; }
+                        return true;
+                    });
 
                     if (relevantIssues.length > 0) {
                         const resolved = await this.resolveIssuesInteractively(gitService, relevantIssues, progress);
@@ -356,7 +370,7 @@ export class MessageHandler {
                     // ── Step 7: Commit ──
                     progress.report({ message: 'Committing...' });
                     try {
-                        await gitService.commit(payload.message);
+                        await gitService.commit(payload.message || 'Fast Push: Auto-commit');
                     } catch (e: any) {
                         const msg = e.message || '';
                         if (msg.includes('nothing to commit') || msg.includes('working tree clean') || msg.includes('no changes added to commit') || msg.includes('nothing added to commit')) {
@@ -369,7 +383,7 @@ export class MessageHandler {
                     // ── Step 8: Rename branch on first commit ──
                     if (!hasCommits) {
                         try {
-                            await gitService.renameBranch(payload.branch);
+                            await gitService.renameBranch(branch);
                         } catch (e) {
                             Logger.warn('Branch rename after first commit failed (non-critical)', { error: e });
                         }

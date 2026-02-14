@@ -1281,6 +1281,16 @@
             if (newBranchInput.style.display !== 'none' && newBranchInput.value.trim()) {
                 branch = newBranchInput.value.trim();
             }
+
+            // Validate branch name — reject loading placeholders and invalid chars
+            if (!branch || branch === 'Loading...' || branch.startsWith('Loading')) {
+                branch = 'main';
+            }
+            if (!/^[a-zA-Z0-9_\/-]+$/.test(branch)) {
+                vscode.postMessage({ type: 'error', value: 'Invalid branch name: "' + branch + '". Use only alphanumeric, _, /, -' });
+                return;
+            }
+
             const message = document.getElementById('fp-message').value;
 
             vscode.postMessage({
@@ -1634,7 +1644,7 @@
                 if (url) {
                     // Show loading in branch select
                     const branchSel = document.getElementById('fp-branch-select');
-                    branchSel.innerHTML = '<option>Loading...</option>';
+                    branchSel.innerHTML = '<option value="">Loading...</option>';
                     // Fetch branches
                     vscode.postMessage({ type: 'get-remote-branches', value: url });
                 }

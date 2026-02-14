@@ -95,8 +95,16 @@ export class GitService {
             } catch (retryErr) { /* fall through */ }
           }
 
+          // Filter out warning lines from stderr to keep error messages concise.
+          // Git warnings (LF/CRLF, etc.) inflate error output and confuse users.
+          const filteredStderr = errOut
+            .split('\n')
+            .filter(line => !line.startsWith('warning:'))
+            .join('\n')
+            .trim();
+
           const parts: string[] = [];
-          if (errOut) { parts.push(errOut.trim()); }
+          if (filteredStderr) { parts.push(filteredStderr); }
           else if (err.message) { parts.push(err.message); }
           if (out && !out.includes('fatal')) { parts.push(`Stdout: ${out.trim()}`); }
 
@@ -165,8 +173,10 @@ export class GitService {
         }
         return 'Pushed successfully';
       } catch (e: any) {
-        Logger.error('VS Code Git API push failed', e);
-        throw new Error(`Push failed: ${e.message}`);
+        Logger.warn('VS Code Git API push failed, falling back to CLI', { error: e.message });
+        // Fall through to CLI fallback instead of throwing immediately.
+        // This handles cases where VS Code Git extension hasn't detected
+        // a newly initialized repo yet.
       }
     }
 
@@ -581,8 +591,77 @@ export class GitService {
   }
 
   public async addAll(): Promise<string> {
-    await this.execGit(['add', '--all']);
-    try { await this.execGit(['reset', '--', 'nul']); } catch { /* ok */ }
+    // On Windows, reserved device names (nul, con, aux, prn, etc.) cause
+    // 'git add --all' to fail with "unable to index file 'nul'".
+    // Also configure autocrlf to suppress LF/CRLF warnings.
+    const isWindows = process.platform === 'win32';
+
+    if (isWindows) {
+      // Suppress CRLF warnings on Windows
+      try { await this.execGit(['config', 'core.autocrlf', 'true']); } catch { /* ok */ }
+
+      // Use pathspec exclusion to skip Windows reserved device names
+      const reserved = ['nul', 'NUL', 'con', 'CON', 'aux', 'AUX', 'prn', 'PRN',
+        'com1', 'COM1', 'com2', 'COM2', 'com3', 'COM3', 'com4', 'COM4',
+        'lpt1', 'LPT1', 'lpt2', 'LPT2', 'lpt3', 'LPT3'];
+      const exclusions = reserved.map(name => `:(exclude)${name}`);
+
+      try {
+        await this.execGit(['add', '-A', '--', '.', ...exclusions]);
+      } catch (e: any) {
+        const msg = e.message || '';
+        // If pathspec exclusion isn't supported, fall back to add then reset
+        if (msg.includes('pathspec') || msg.includes('not a valid')) {
+          try {
+            await this.execGit(['add', '--all']);
+          } catch (addErr: any) {
+            const addMsg = addErr.message || '';
+            if (addMsg.includes('nul') || addMsg.includes('NUL') || addMsg.includes('unable to index')) {
+              // Stage everything except reserved names: add tracked + new non-reserved files
+              await this.execGit(['add', '-u']); // stage modifications/deletions
+              // Get untracked files and add only non-reserved ones
+              const untracked = await this.getUntrackedFiles();
+              const reservedLower = new Set(reserved.map(n => n.toLowerCase()));
+              const safeFiles = untracked.filter(f => {
+                const baseName = f.split(/[\\/]/).pop()?.toLowerCase() || '';
+                return !reservedLower.has(baseName);
+              });
+              if (safeFiles.length > 0) {
+                // Add in batches to avoid command-line length limits
+                const batchSize = 50;
+                for (let i = 0; i < safeFiles.length; i += batchSize) {
+                  const batch = safeFiles.slice(i, i + batchSize);
+                  await this.execGit(['add', '--', ...batch]);
+                }
+              }
+            } else {
+              throw addErr;
+            }
+          }
+        } else if (msg.includes('nul') || msg.includes('NUL') || msg.includes('unable to index')) {
+          // Exclusion syntax worked but nul still slipped through somehow
+          await this.execGit(['add', '-u']);
+          const untracked = await this.getUntrackedFiles();
+          const reservedLower = new Set(reserved.map(n => n.toLowerCase()));
+          const safeFiles = untracked.filter(f => {
+            const baseName = f.split(/[\\/]/).pop()?.toLowerCase() || '';
+            return !reservedLower.has(baseName);
+          });
+          if (safeFiles.length > 0) {
+            const batchSize = 50;
+            for (let i = 0; i < safeFiles.length; i += batchSize) {
+              const batch = safeFiles.slice(i, i + batchSize);
+              await this.execGit(['add', '--', ...batch]);
+            }
+          }
+        } else {
+          throw e;
+        }
+      }
+    } else {
+      await this.execGit(['add', '--all']);
+    }
+
     return 'All files staged';
   }
 
@@ -637,7 +716,12 @@ export class GitService {
   }
 
   public async init(): Promise<string> {
-    return await this.execGit(['init']);
+    const result = await this.execGit(['init']);
+    // On Windows, configure autocrlf to prevent LF/CRLF warnings
+    if (process.platform === 'win32') {
+      try { await this.execGit(['config', 'core.autocrlf', 'true']); } catch { /* ok */ }
+    }
+    return result;
   }
 
   // ───────────────────────────── State Information ─────────────────────────────
