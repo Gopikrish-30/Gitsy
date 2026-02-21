@@ -1,9 +1,9 @@
 {
   "name": "gitsy",
-  "displayName": "Gitsy: Git Helper",
+  "displayName": "Gitsy: AI-Powered Git Helper",
   "publisher": "gitsy",
-  "description": "A VS Code extension for Git operations with GitHub integration.",
-  "version": "0.0.2",
+  "description": "AI-powered Git extension with VS Code Copilot pre-flight checks — catches secrets, code quality issues, and branch safety risks before you push.",
+  "version": "0.0.3",
   "icon": "media/gitsy.png",
   "repository": {
     "type": "git",
@@ -13,6 +13,7 @@
     "vscode": "^1.106.1"
   },
   "categories": [
+    "SCM Providers",
     "Other"
   ],
   "activationEvents": [],
@@ -41,8 +42,29 @@
       {
         "command": "gitsy.setPat",
         "title": "Gitsy: Set GitHub PAT"
+      },
+      {
+        "command": "gitsy.configureAI",
+        "title": "Gitsy: Configure AI Pre-flight"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Gitsy",
+      "properties": {
+        "gitsy.aiProvider": {
+          "type": "string",
+          "enum": ["auto", "copilot", "gemini", "disabled"],
+          "enumDescriptions": [
+            "Auto: try GitHub Copilot first, fall back to Gemini",
+            "GitHub Copilot only (no API key needed)",
+            "Google Gemini API (requires free API key)",
+            "Disable AI pre-flight checks"
+          ],
+          "default": "auto",
+          "description": "AI provider used for Gitsy pre-flight checks before git operations."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

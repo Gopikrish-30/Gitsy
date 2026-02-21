@@ -1,11 +1,12 @@
 import * as vscode from 'vscode';
 import { SidebarProvider } from './SidebarProvider';
 import { Logger } from './logger';
+import { AIPreflightService } from './AIPreflightService';
 
 export function activate(context: vscode.ExtensionContext) {
-	Logger.initialize();
-	Logger.info('Gitsy extension activating...');
-	console.log('Gitsy extension activated');
+    Logger.initialize();
+    Logger.info('Gitsy extension activating...');
+    console.log('Gitsy extension activated');
 
     // Register Sidebar Provider
     const sidebarProvider = new SidebarProvider(context.extensionUri, context);
@@ -30,7 +31,13 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-	context.subscriptions.push(setPat);
+    const aiPreflightService = new AIPreflightService(context);
+    const configureAI = vscode.commands.registerCommand('gitsy.configureAI', async () => {
+        await aiPreflightService.configureApiKey();
+    });
+
+    context.subscriptions.push(setPat, configureAI);
 }
 
-export function deactivate() {}
+export function deactivate() { }
+

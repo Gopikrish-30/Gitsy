@@ -7,6 +7,8 @@ import { MessageHandler } from "./MessageHandler";
 import { GitOperations } from "./GitOperations";
 import { StatsRefresher } from "./StatsRefresher";
 import { Logger } from "./logger";
+import { AIPreflightService } from "./AIPreflightService";
+import { FlowLogger } from "./FlowLogger";
 
 export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Disposable {
     _view?: vscode.WebviewView;
@@ -14,11 +16,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
     private messageHandler: MessageHandler;
     private gitOperations: GitOperations;
     private statsRefresher: StatsRefresher;
+    private aiPreflightService: AIPreflightService;
+    private flowLogger: FlowLogger;
     private disposables: vscode.Disposable[] = [];
 
     constructor(private readonly _extensionUri: vscode.Uri, private readonly _context: vscode.ExtensionContext) {
         this.authService = new AuthService(_context);
         this.gitOperations = new GitOperations(_context, this.authService);
+        this.aiPreflightService = new AIPreflightService(_context);
+        this.flowLogger = new FlowLogger(_context);
         this.statsRefresher = new StatsRefresher(
             _context,
             this.authService,
@@ -28,6 +34,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
             _context,
             this.authService,
             this.gitOperations,
+            this.aiPreflightService,
+            this.flowLogger,
             (message) => this.postMessageSafe(message),
             () => this.statsRefresher.refresh(true),
             () => this.checkAuth()
@@ -35,7 +43,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
 
         // Real-time file monitoring for user's workspace
         this.setupFileWatchers();
-        
+
         // Initialize git listener asynchronously to avoid blocking activation
         this.initGitListener();
 
@@ -54,7 +62,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
         // Watch for file changes in the workspace, EXCLUDING .git internals
         // (.git changes are handled by the Git extension listener instead)
         const fileWatcher = vscode.workspace.createFileSystemWatcher('**/*', false, false, false);
-        
+
         // All file system events use debounced scheduling (never bypass debounce)
         this._context.subscriptions.push(
             fileWatcher.onDidCreate((uri) => {
@@ -64,7 +72,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
                 this.statsRefresher.scheduleRefresh(true);
             })
         );
-        
+
         this._context.subscriptions.push(
             fileWatcher.onDidChange((uri) => {
                 if (uri.fsPath.includes('.git')) { return; }
@@ -72,7 +80,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
                 this.statsRefresher.scheduleRefresh(true);
             })
         );
-        
+
         this._context.subscriptions.push(
             fileWatcher.onDidDelete((uri) => {
                 if (uri.fsPath.includes('.git')) { return; }
@@ -80,7 +88,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
                 this.statsRefresher.scheduleRefresh(true);
             })
         );
-        
+
         // Text document saved (more reliable for text files)
         this._context.subscriptions.push(
             vscode.workspace.onDidSaveTextDocument((doc) => {
@@ -88,7 +96,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
                 this.statsRefresher.scheduleRefresh(true);
             })
         );
-        
+
         // *** REAL-TIME TYPING DETECTION ***
         // Text document changed (AS YOU TYPE - before saving)
         this._context.subscriptions.push(
@@ -103,21 +111,21 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
                 }
             })
         );
-        
+
         // Document opened — non-immediate debounce
         this._context.subscriptions.push(
             vscode.workspace.onDidOpenTextDocument(() => {
                 this.statsRefresher.scheduleRefresh();
             })
         );
-        
+
         // Active editor changed — non-immediate debounce
         this._context.subscriptions.push(
             vscode.window.onDidChangeActiveTextEditor(() => {
                 this.statsRefresher.scheduleRefresh();
             })
         );
-        
+
         // Workspace folders changed (multi-root support)
         this._context.subscriptions.push(
             vscode.workspace.onDidChangeWorkspaceFolders(() => {
@@ -125,9 +133,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
                 this.statsRefresher.scheduleRefresh(true);
             })
         );
-        
+
         this._context.subscriptions.push(fileWatcher);
-        
+
         Logger.info('File watchers initialized for real-time monitoring (including unsaved changes)');
     }
 
@@ -173,7 +181,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
                     this.statsRefresher.scheduleRefresh(true);
                 })
             );
-            
+
             // Listen when repositories are closed
             this._context.subscriptions.push(
                 git.onDidCloseRepository(() => {
@@ -181,7 +189,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider, vscode.Dispo
                     this.statsRefresher.scheduleRefresh(true);
                 })
             );
-            
+
             Logger.info('Git extension listeners initialized');
         } catch (e) {
             Logger.error('Failed to initialize Git listener', e);

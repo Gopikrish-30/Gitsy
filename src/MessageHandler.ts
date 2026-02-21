@@ -6,16 +6,20 @@ import { GitOperations } from './GitOperations';
 import { Logger } from './logger';
 import { WebviewMessage, Settings, FastPushPayload } from './types';
 import { parseGitHubUrl } from './utils';
+import { AIPreflightService } from './AIPreflightService';
+import { FlowLogger } from './FlowLogger';
 
 export class MessageHandler {
     constructor(
         private context: vscode.ExtensionContext,
         private authService: AuthService,
         private gitOperations: GitOperations,
+        private aiPreflightService: AIPreflightService,
+        private flowLogger: FlowLogger,
         private postMessage: (message: any) => void,
         private refreshStats: () => Promise<void>,
         private checkAuth: () => Promise<void>
-    ) {}
+    ) { }
 
     public async handleMessage(data: WebviewMessage): Promise<void> {
         if (!data || typeof data.type !== 'string') {
@@ -82,6 +86,17 @@ export class MessageHandler {
                 case 'pr-merge':
                     await this.handlePrMerge(data.value);
                     break;
+                case 'get-flow':
+                    this.postMessage({ type: 'update-flow', value: this.flowLogger.getEntries() });
+                    break;
+                case 'clear-flow':
+                    this.flowLogger.clearEntries();
+                    this.postMessage({ type: 'update-flow', value: [] });
+                    break;
+                case 'preflight-response':
+                    // User clicked Proceed or Cancel in the custom preflight dialog
+                    this.aiPreflightService.resolvePreflightResponse(data.value === 'proceed');
+                    break;
                 default:
                     Logger.warn('Unknown message type', { type: data.type });
             }
@@ -95,6 +110,49 @@ export class MessageHandler {
         Logger.info(`Starting git action: ${action}`);
         this.postMessage({ type: 'set-loading', value: true });
         this.postMessage({ type: 'action-started', value: action });
+
+        // Operations that should NOT trigger AI pre-flight (no meaningful check needed)
+        const SKIP_AI_OPS = new Set(['switch-branch', 'delete-branch', 'create-branch', 'fetch']);
+
+        // Resolve repo info for flow logging
+        const repoPath = await this.gitOperations.getRepoSelection().catch(() => undefined);
+        const gitService = repoPath ? new GitService(repoPath) : undefined;
+        const branch = gitService ? await gitService.getCurrentBranch().catch(() => 'unknown') : 'unknown';
+        const repoName = gitService ? await gitService.getRepoName().catch(() => 'unknown') : 'unknown';
+        const details = payload?.message ? `"${payload.message}"` : (payload?.name ? `→ ${payload.name}` : `→ ${branch}`);
+
+        // ─── AI Pre-flight Check (only for meaningful operations) ───
+        let preflightStatus: 'passed' | 'failed' | 'skipped' = 'skipped';
+        if (gitService && !SKIP_AI_OPS.has(action)) {
+            try {
+                this.postMessage({ type: 'ai-preflight-start', value: action });
+                const preflight = await this.aiPreflightService.runPreflightCheck(action, gitService);
+
+                if (!preflight.skipped) {
+                    preflightStatus = preflight.passed ? 'passed' : 'failed';
+                    // Always show dialog to user for explicit proceed confirmation
+                    const proceed = await this.aiPreflightService.showPreflightInWebview(preflight, action, this.postMessage.bind(this));
+                    if (!proceed) {
+                        this.postMessage({ type: 'close-preflight-dialog' });
+                        this.postMessage({ type: 'set-loading', value: false });
+                        this.postMessage({ type: 'action-finished', value: action });
+                        return;
+                    }
+                } else {
+                    // AI skipped (no provider) — close any open dialog
+                    this.postMessage({ type: 'close-preflight-dialog' });
+                }
+            } catch (e) {
+                Logger.warn('AI pre-flight check threw unexpectedly', { error: e });
+                this.postMessage({ type: 'close-preflight-dialog' });
+                preflightStatus = 'skipped';
+            }
+        }
+
+        // ─── Start Flow Log Entry ───
+        const entryId = this.flowLogger.startEntry(action, details, branch, repoName, preflightStatus);
+        this.postMessage({ type: 'update-flow', value: this.flowLogger.getEntries() });
+
         try {
             await vscode.window.withProgress(
                 {
@@ -113,12 +171,16 @@ export class MessageHandler {
                     }
                 }
             );
+            this.flowLogger.completeEntry(entryId, 'success');
         } catch (error: any) {
             Logger.error(`Git action '${action}' failed`, error);
             vscode.window.showErrorMessage(`Git ${action} failed: ${error.message}`);
+            this.flowLogger.completeEntry(entryId, 'failed', error.message);
         } finally {
             this.postMessage({ type: 'set-loading', value: false });
             this.postMessage({ type: 'action-finished', value: action });
+            this.postMessage({ type: 'close-preflight-dialog' }); // Always close dialog when op ends
+            this.postMessage({ type: 'update-flow', value: this.flowLogger.getEntries() });
         }
     }
 
@@ -261,6 +323,33 @@ export class MessageHandler {
         const token = await this.context.secrets.get("gitsy.githubPat");
         const gitService = new GitService(repoPath);
 
+        // Resolve names for flow logging
+        const branch = payload.branch || await gitService.getCurrentBranch().catch(() => 'unknown');
+        const repoName = await gitService.getRepoName().catch(() => '');
+        const details = `→ ${branch} | "${payload.message || 'Fast Push: Auto-commit'}"`;
+
+        // ─── AI Pre-flight Check ───
+        let preflightStatus: 'passed' | 'failed' | 'skipped' = 'skipped';
+        try {
+            this.postMessage({ type: 'ai-preflight-start', value: 'fast-push' });
+            const preflight = await this.aiPreflightService.runPreflightCheck('fast-push', gitService);
+            this.postMessage({ type: 'ai-preflight-done', value: preflight });
+
+            if (!preflight.skipped) {
+                preflightStatus = preflight.passed ? 'passed' : 'failed';
+                const proceed = await this.aiPreflightService.showPreflightInWebview(preflight, 'fast-push', this.postMessage.bind(this));
+                if (!proceed) {
+                    return;
+                }
+            }
+        } catch (e) {
+            Logger.warn('AI pre-flight check failed for fast-push', { error: e });
+        }
+
+        // ─── Start Flow Log ───
+        const entryId = this.flowLogger.startEntry('fast-push', details, branch, repoName, preflightStatus);
+        this.postMessage({ type: 'update-flow', value: this.flowLogger.getEntries() });
+
         try {
             this.postMessage({ type: 'set-loading', value: true });
 
@@ -290,10 +379,10 @@ export class MessageHandler {
                     let remoteUrl = payload.repoUrl;
 
                     // Validate branch name — reject loading placeholders
-                    let branch = payload.branch;
-                    if (!branch || branch === 'Loading...' || branch.startsWith('Loading') || !/^[a-zA-Z0-9_\/-]+$/.test(branch)) {
-                        Logger.warn('Invalid branch name received, defaulting to main', { branch });
-                        branch = 'main';
+                    let targetBranch = payload.branch;
+                    if (!targetBranch || targetBranch === 'Loading...' || targetBranch.startsWith('Loading') || !/^[a-zA-Z0-9_\/-]+$/.test(targetBranch)) {
+                        Logger.warn('Invalid branch name received, defaulting to main', { branch: targetBranch });
+                        targetBranch = 'main';
                     }
 
                     if (payload.repoType === 'new') {
@@ -331,13 +420,13 @@ export class MessageHandler {
                     // ── Step 4: Switch branch if needed ──
                     if (hasCommits) {
                         const currentBranch = await gitService.getCurrentBranch();
-                        if (currentBranch !== branch) {
-                            progress.report({ message: `Switching to branch ${branch}...` });
-                            const hasLocal = await gitService.hasLocalBranch(branch);
+                        if (currentBranch !== targetBranch) {
+                            progress.report({ message: `Switching to branch ${targetBranch}...` });
+                            const hasLocal = await gitService.hasLocalBranch(targetBranch);
                             if (!hasLocal) {
-                                await gitService.createBranch(branch);
+                                await gitService.createBranch(targetBranch);
                             } else {
-                                await gitService.switchBranch(branch);
+                                await gitService.switchBranch(targetBranch);
                             }
                         }
                     }
@@ -348,9 +437,7 @@ export class MessageHandler {
 
                     // Filter out issues already handled above + false positives for new repos
                     const relevantIssues = issues.filter(i => {
-                        // Already handled by steps above
                         if (i.id === 'no-repo' || i.id === 'no-remote') { return false; }
-                        // For brand new repos (no commits), these are expected — not real issues
                         if (!hasCommits && (i.id === 'detached-head' || i.id === 'upstream-missing' || i.id === 'upstream-broken' || i.id === 'nothing-to-do')) { return false; }
                         return true;
                     });
@@ -383,7 +470,7 @@ export class MessageHandler {
                     // ── Step 8: Rename branch on first commit ──
                     if (!hasCommits) {
                         try {
-                            await gitService.renameBranch(branch);
+                            await gitService.renameBranch(targetBranch);
                         } catch (e) {
                             Logger.warn('Branch rename after first commit failed (non-critical)', { error: e });
                         }
@@ -421,11 +508,15 @@ export class MessageHandler {
                     await this.refreshStats();
                 }
             );
+            this.flowLogger.completeEntry(entryId, 'success');
         } catch (error: any) {
             Logger.error('Fast Push failed', error);
             vscode.window.showErrorMessage(`Fast Push failed: ${error.message}`);
+            this.flowLogger.completeEntry(entryId, 'failed', error.message);
         } finally {
             this.postMessage({ type: 'set-loading', value: false });
+            this.postMessage({ type: 'close-preflight-dialog' });
+            this.postMessage({ type: 'update-flow', value: this.flowLogger.getEntries() });
         }
     }
 

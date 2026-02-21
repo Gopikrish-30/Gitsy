@@ -305,7 +305,7 @@
         .status-C {
             color: #c792ea;
         }
-        
+
         /* Unsaved changes indicator */
         .file-status::after {
             content: attr(data-unsaved);
@@ -339,7 +339,8 @@
             background-color: var(--accent-hover);
         }
 
-        .primary-btn:disabled, .secondary-btn:disabled {
+        .primary-btn:disabled,
+        .secondary-btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
             pointer-events: none;
@@ -852,15 +853,100 @@
 <body>
 
     <!-- Loading State (shown until auth is determined) -->
-    <div id="loading-view" style="display:flex; align-items:center; justify-content:center; height:100vh; flex-direction:column; gap:12px;">
-        <div style="width:28px; height:28px; border:3px solid var(--text-secondary); border-top-color:var(--button-blue); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+    <div id="loading-view"
+        style="display:flex; align-items:center; justify-content:center; height:100vh; flex-direction:column; gap:12px;">
+        <div
+            style="width:28px; height:28px; border:3px solid var(--text-secondary); border-top-color:var(--button-blue); border-radius:50%; animation:spin 0.8s linear infinite;">
+        </div>
         <span style="color:var(--text-secondary); font-size:0.85em;">Loading Gitsy...</span>
     </div>
-    <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+    <style>
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+
+    <!-- Setup View - Redesigned -->
+    <div id="setup-view" class="setup-container" style="display:none;">
+        <!-- Logo + Brand -->
+        <div style="display:flex;flex-direction:column;align-items:center;padding:28px 0 16px;">
+            <img src="{{logoUri}}" alt="Gitsy" style="width:80px;height:80px;border-radius:16px;" />
+            <div style="font-size:1.5em;font-weight:800;margin-top:10px;letter-spacing:-0.5px;">Gitsy</div>
+            <div
+                style="font-size:11px;color:var(--text-secondary);margin-top:4px;letter-spacing:0.5px;text-transform:uppercase;">
+                Smart Git &#183; AI Pre-flight</div>
+        </div>
+
+        <!-- Feature pills -->
+        <div style="display:flex;flex-direction:column;gap:8px;padding:0 16px 20px;">
+            <div
+                style="display:flex;align-items:center;gap:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:9px 12px;">
+                <span style="font-size:16px;">&#128640;</span>
+                <div>
+                    <div style="font-size:11.5px;font-weight:600;">Fast Push</div>
+                    <div style="font-size:10px;color:var(--text-secondary);">Stage, commit &amp; push in one click</div>
+                </div>
+            </div>
+            <div
+                style="display:flex;align-items:center;gap:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:9px 12px;">
+                <span style="font-size:16px;">&#129302;</span>
+                <div>
+                    <div style="font-size:11.5px;font-weight:600;">AI Pre-flight <span
+                            style="font-size:9px;background:rgba(31,111,235,0.15);color:#388bfd;padding:1px 5px;border-radius:8px;font-weight:700;margin-left:4px;">VS
+                            Code Copilot</span></div>
+                    <div style="font-size:10px;color:var(--text-secondary);">Checks secrets, code quality &amp; more
+                        before every push</div>
+                </div>
+            </div>
+            <div
+                style="display:flex;align-items:center;gap:10px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:8px;padding:9px 12px;">
+                <span style="font-size:16px;">&#9889;</span>
+                <div>
+                    <div style="font-size:11.5px;font-weight:600;">Flow Log</div>
+                    <div style="font-size:10px;color:var(--text-secondary);">Full session history of all git operations
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auth button -->
+        <div style="padding:0 16px 14px;">
+            <button class="auth-btn" onclick="connectGitHub()"
+                style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 0;font-size:13px;">
+                <svg height="18" viewBox="0 0 16 16" version="1.1" width="18" aria-hidden="true" fill="currentColor">
+                    <path fill-rule="evenodd"
+                        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+                </svg>
+                Connect with GitHub
+            </button>
+        </div>
+
+        <div id="auth-help" class="auth-help-text" style="text-align:center;font-size:11px;padding-bottom:8px;"></div>
+
+        <div
+            style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px 20px;border-top:1px solid var(--border-color);">
+            <span style="font-size:13px;">&#128274;</span>
+            <span style="font-size:10px;color:var(--text-secondary);">Secure OAuth 2.0 &#183; Code stays private &#183;
+                AI via VS Code Copilot</span>
+        </div>
+    </div>
+
+    <span style="color:var(--text-secondary); font-size:0.85em;">Loading Gitsy...</span>
+    </div>
+    <style>
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 
     <!-- Setup View -->
     <div id="setup-view" class="setup-container" style="display:none;">
-        <div class="setup-logo-container" style="display: flex; flex-direction: column; align-items: center; background: none; box-shadow: none; width: auto; height: auto;">
+        <div class="setup-logo-container"
+            style="display: flex; flex-direction: column; align-items: center; background: none; box-shadow: none; width: auto; height: auto;">
             <img src="{{logoUri}}" alt="Gitsy" style="width: 200px; height: 200px; margin-bottom: 0px;" />
             <div class="setup-title" style="margin-top: -10px; font-size: 1.25em;">Gitsy</div>
         </div>
@@ -893,6 +979,7 @@
     <div id="main-view" style="display: none;">
         <div class="tab-nav">
             <button class="tab-link active" onclick="openTab('dashboard')">Dashboard</button>
+            <button class="tab-link" onclick="openTab('flow')">⚡ Flow</button>
         </div>
 
         <!-- Dashboard Tab -->
@@ -1027,7 +1114,8 @@
 
             <!-- Account Section -->
             <div class="section-header" style="margin-top:20px;">Account</div>
-            <p style="font-size:0.85em; color:var(--text-secondary); margin:8px 0 16px 0;">Authenticated via GitHub OAuth. Your token is managed securely by VS Code.</p>
+            <p style="font-size:0.85em; color:var(--text-secondary); margin:8px 0 16px 0;">Authenticated via GitHub
+                OAuth. Your token is managed securely by VS Code.</p>
 
             <div style="border-top:1px solid var(--border-color); padding-top:20px;">
                 <button class="primary-btn" style="background-color: var(--error);"
@@ -1383,17 +1471,18 @@
                     break;
 
                 case 'update-stats':
+                    { const lv = document.getElementById('loading-view'); if (lv) lv.style.display = 'none'; }
                     if (value.repoName) document.getElementById('repo-name').innerText = value.repoName;
                     if (value.remote) document.getElementById('repo-path').innerText = value.remote;
                     if (value.lastCommit) document.getElementById('repo-last-commit').innerText = value.lastCommit;
-                    
+
                     // Branch - with tooltip
                     if (value.branch) {
                         const branchEl = document.getElementById('stat-branch');
                         branchEl.innerText = value.branch;
                         branchEl.title = `Current branch: ${value.branch}`;
                     }
-                    
+
                     if (value.status) {
                         const isDirty = value.status !== 'Clean' && value.status.trim().length > 0;
                         document.getElementById('stat-status').innerText = isDirty ? "Pending Changes" : "Synced";
@@ -1535,11 +1624,11 @@
                             const d = document.createElement('div');
                             d.className = 'file-item';
                             d.style.cursor = 'pointer';
-                            
+
                             // Check if file has unsaved changes (marked with *)
                             const hasUnsaved = item.status.includes('*');
                             const cleanStatus = item.status.replace('*', '');
-                            
+
                             // map status char to class
                             const statusChar = cleanStatus.trim().charAt(0);
                             const statusClass = 'status-' + statusChar;
@@ -1548,12 +1637,12 @@
                                 <span class="file-path" title="${item.path}">${item.path}</span>
                                 <span class="file-status ${statusClass}" ${hasUnsaved ? 'data-unsaved="*"' : ''}>${cleanStatus}</span>
                             `;
-                            
+
                             // Add click handler to open file
                             d.addEventListener('click', () => {
                                 vscode.postMessage({ type: 'open-file', value: item.path });
                             });
-                            
+
                             list.appendChild(d);
                         });
                     } else {
@@ -1663,7 +1752,819 @@
         function mergePR(prNumber) {
             vscode.postMessage({ type: 'pr-merge', value: { prNumber } });
         }
+
+        // ─── Flow Tab ───
+        let flowEntries = [];
+
+        function renderFlowTab(entries) {
+            flowEntries = entries || [];
+            const container = document.getElementById('flow-list');
+            if (!container) { return; }
+            if (flowEntries.length === 0) {
+                container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-secondary);"><div style="font-size:2em;margin-bottom:12px;">&#9889;</div><div style="font-weight:600;margin-bottom:6px;">No operations yet</div><div style="font-size:0.85em;">Git actions you perform via Gitsy will appear here as a session log.</div></div>';
+                return;
+            }
+            const groups = {};
+            flowEntries.forEach(entry => {
+                const d = new Date(entry.startTime);
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                let label = d.toDateString() === today.toDateString() ? 'Today'
+                    : d.toDateString() === yesterday.toDateString() ? 'Yesterday'
+                        : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                if (!groups[label]) { groups[label] = []; }
+                groups[label].push(entry);
+            });
+            let html = '';
+            Object.keys(groups).forEach(label => {
+                html += '<div class="flow-date-group">' + label + '</div>';
+                groups[label].forEach(entry => { html += renderFlowEntry(entry); });
+            });
+            container.innerHTML = html;
+        }
+
+        function renderFlowEntry(entry) {
+            const opIcons = { 'fast-push': '&#128640;', 'push': '&#8679;', 'pull': '&#8681;', 'commit': '&#128221;', 'stash': '&#128203;', 'create-branch': '&#127807;', 'delete-branch': '&#128465;', 'switch-branch': '&#128256;', 'merge': '&#128256;', 'fetch': '&#128260;', 'rebase': '&#8617;' };
+            const icon = opIcons[entry.operation] || '&#9889;';
+            const statusClass = { running: 'flow-running', success: 'flow-success', failed: 'flow-failed', cancelled: 'flow-cancelled' }[entry.status] || 'flow-running';
+            const statusIcon = { running: '&#9203;', success: '&#9989;', failed: '&#10060;', cancelled: '&#8856;' }[entry.status] || '&#9203;';
+            const duration = entry.durationMs ? (entry.durationMs / 1000).toFixed(1) + 's' : '';
+            const relTime = timeAgo(entry.startTime);
+            let preflightBadge = '';
+            if (entry.preflightStatus === 'passed') { preflightBadge = '<span class="preflight-badge preflight-pass">AI &#10003;</span>'; }
+            else if (entry.preflightStatus === 'failed') { preflightBadge = '<span class="preflight-badge preflight-warn">AI &#9888;</span>'; }
+            const errStr = entry.error ? '<div class="flow-entry-error">' + escHtml(entry.error.substring(0, 120)) + '</div>' : '';
+            return '<div class="flow-entry ' + statusClass + '"><div class="flow-entry-header"><span class="flow-op-icon">' + icon + '</span><span class="flow-op-name">' + escHtml(entry.operation) + '</span>' + preflightBadge + '<span class="flow-entry-status">' + statusIcon + '</span></div><div class="flow-entry-details">' + escHtml(entry.details) + '</div><div class="flow-entry-meta"><span>' + (entry.branch ? '&#8887; ' + escHtml(entry.branch) : '') + '</span><span>' + (duration ? duration + ' &middot; ' : '') + relTime + '</span></div>' + errStr + '</div>';
+        }
+
+        function timeAgo(ts) {
+            const diff = Date.now() - ts;
+            if (diff < 60000) { return Math.round(diff / 1000) + 's ago'; }
+            if (diff < 3600000) { return Math.round(diff / 60000) + ' min ago'; }
+            if (diff < 86400000) { return Math.round(diff / 3600000) + 'h ago'; }
+            return Math.round(diff / 86400000) + 'd ago';
+        }
+
+        function escHtml(s) {
+            if (!s) { return ''; }
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // Handle extension messages for Flow tab
+        window.addEventListener('message', function (evt) {
+            const msg = evt.data;
+            if (!msg) { return; }
+
+            // Flow list updates — also sync the in-memory flowEntries so 30s interval doesn't re-render stale data
+            if (msg.type === 'update-flow') { flowEntries = msg.value || []; renderFlowTab(flowEntries); }
+
+            // Show AI checking status in Flow header
+            if (msg.type === 'ai-preflight-start') {
+                const el = document.getElementById('flow-ai-status');
+                if (el) { el.innerHTML = '<span class="ai-pulse"></span> AI checking ' + escHtml(msg.value || '') + '...'; }
+            }
+
+            // Clear AI status when operation finishes or dialog closes
+            if (msg.type === 'action-finished' || msg.type === 'close-preflight-dialog') {
+                const el = document.getElementById('flow-ai-status');
+                if (el) { el.innerHTML = ''; }
+            }
+
+            // Ensure loading-view is hidden when we get real data
+            if (msg.type === 'update-stats' || msg.type === 'update-flow') {
+                const lv = document.getElementById('loading-view');
+                if (lv && lv.style.display !== 'none') { lv.style.display = 'none'; }
+            }
+        });
+
+        vscode.postMessage({ type: 'get-flow' });
+        setInterval(() => { if (flowEntries.length > 0) { renderFlowTab(flowEntries); } }, 30000);
+
     </script>
+
+    <!-- Flow Tab Panel HTML — inside main-view will be added via JS below -->
+    <script>
+        (function () {
+            // Inject Flow tab panel into main-view after DOM ready
+            const mainView = document.getElementById('main-view');
+            if (mainView) {
+                const flowDiv = document.createElement('div');
+                flowDiv.id = 'flow';
+                flowDiv.className = 'tab-content';
+                flowDiv.innerHTML = '<div class="flow-header"><div class="flow-header-left"><span class="flow-header-title">&#9889; Flow &mdash; Session Log</span><span id="flow-ai-status"></span></div><button class="flow-clear-btn" id="flow-clear-btn">Clear</button></div><div id="flow-list"><div style="text-align:center;padding:40px 20px;color:var(--text-secondary);"><div style="font-size:2em;margin-bottom:12px;">&#9889;</div><div style="font-weight:600;margin-bottom:6px;">No operations yet</div><div style="font-size:11px;color:var(--text-secondary);">Git operations will appear here</div></div></div>';
+                // Attach clear button event (can't use confirm() in VS Code webview)
+                setTimeout(function () {
+                    var clearBtn = document.getElementById('flow-clear-btn');
+                    if (clearBtn) {
+                        clearBtn.addEventListener('click', function () {
+                            vscode.postMessage({ type: 'clear-flow' });
+                        });
+                    }
+                }, 100);
+                mainView.appendChild(flowDiv);
+            }
+        })();
+    </script>
+
+    <style>
+        #flow {
+            padding: 0;
+        }
+
+        .flow-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px 8px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            background: var(--bg-color);
+            z-index: 5;
+        }
+
+        .flow-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .flow-header-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-secondary);
+        }
+
+        #flow-ai-status {
+            font-size: 10px;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-height: 14px;
+        }
+
+        .ai-pulse {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1)
+            }
+
+            50% {
+                opacity: 0.3;
+                transform: scale(0.7)
+            }
+        }
+
+        .flow-clear-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 10px;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .flow-clear-btn:hover {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+        }
+
+        #flow-list {
+            padding: 8px 12px 20px;
+        }
+
+        .flow-date-group {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-secondary);
+            font-weight: 700;
+            padding: 10px 0 4px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 6px;
+        }
+
+        .flow-entry {
+            padding: 8px 10px;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid var(--border-color);
+            border-left-width: 3px;
+            background: var(--card-bg);
+            transition: background 0.1s;
+        }
+
+        .flow-entry:hover {
+            background: var(--hover-bg);
+        }
+
+        .flow-entry-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 2px;
+        }
+
+        .flow-op-icon {
+            font-size: 13px;
+        }
+
+        .flow-op-name {
+            font-weight: 600;
+            font-size: 12px;
+            flex: 1;
+        }
+
+        .flow-entry-status {
+            font-size: 13px;
+        }
+
+        .flow-entry-details {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-family: monospace;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            margin-bottom: 3px;
+        }
+
+        .flow-entry-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .flow-entry-error {
+            margin-top: 4px;
+            font-size: 10px;
+            color: #f14c4c;
+            font-family: monospace;
+            background: rgba(241, 76, 76, 0.08);
+            padding: 3px 6px;
+            border-radius: 3px;
+        }
+
+        .flow-running {
+            border-left-color: var(--accent);
+        }
+
+        .flow-success {
+            border-left-color: #238636;
+        }
+
+        .flow-failed {
+            border-left-color: #d73a49;
+        }
+
+        .flow-cancelled {
+            border-left-color: var(--text-secondary);
+        }
+
+        .preflight-badge {
+            font-size: 10px;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .preflight-pass {
+            background: rgba(35, 134, 54, 0.15);
+            color: #3fb950;
+        }
+
+        .preflight-warn {
+            background: rgba(210, 153, 34, 0.15);
+            color: #d29922;
+        }
+    </style>
+
+
+    <!-- ═══════════════════════════════════════════════════
+         Custom AI Pre-flight Dialog Overlay
+         ═══════════════════════════════════════════════════ -->
+    <style>
+        #preflight-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #preflight-overlay.pf-visible {
+            display: flex;
+        }
+
+        #preflight-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 88vh;
+            overflow-y: auto;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+            animation: slideUp 0.22s cubic-bezier(.22, .68, 0, 1.2);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px) scale(0.97);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        #pf-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #pf-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        #pf-title {
+            font-weight: 700;
+            font-size: 13px;
+            flex: 1;
+        }
+
+        #pf-provider {
+            font-size: 10px;
+            color: var(--text-secondary);
+            background: var(--hover-bg);
+            padding: 2px 7px;
+            border-radius: 10px;
+        }
+
+        #pf-body {
+            padding: 14px 16px;
+        }
+
+        .scan-steps {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .scan-step {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 5px 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+            transition: color 0.2s;
+        }
+
+        .scan-step.pf-active {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .scan-step.pf-done {
+            color: #3fb950;
+        }
+
+        .scan-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--border-color);
+            flex-shrink: 0;
+            transition: background 0.25s;
+        }
+
+        .scan-step.pf-active .scan-dot {
+            background: var(--accent);
+            animation: pulse 0.9s infinite;
+        }
+
+        .scan-step.pf-done .scan-dot {
+            background: #3fb950;
+        }
+
+        #pf-passed-view {
+            display: none;
+            text-align: center;
+            padding: 10px 0 18px;
+        }
+
+        .pf-passed-icon {
+            font-size: 38px;
+            margin-bottom: 8px;
+        }
+
+        #pf-result {
+            display: none;
+        }
+
+        #pf-summary {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pf-issue {
+            background: var(--hover-bg);
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-left: 3px solid var(--border-color);
+        }
+
+        .pf-issue.error {
+            border-left-color: #d73a49;
+        }
+
+        .pf-issue.warning {
+            border-left-color: #d29922;
+        }
+
+        .pf-issue.info {
+            border-left-color: var(--accent);
+        }
+
+        .pf-issue-hdr {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+
+        .pf-sev {
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .sev-error {
+            background: rgba(215, 58, 73, .15);
+            color: #f14c4c;
+        }
+
+        .sev-warning {
+            background: rgba(210, 153, 34, .15);
+            color: #d29922;
+        }
+
+        .sev-info {
+            background: rgba(31, 111, 235, .15);
+            color: #388bfd;
+        }
+
+        .pf-issue-title {
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .pf-file {
+            font-family: monospace;
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-bottom: 3px;
+        }
+
+        .pf-desc {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin: 4px 0;
+            line-height: 1.4;
+        }
+
+        .pf-sol {
+            font-size: 11px;
+            color: #3fb950;
+            display: flex;
+            gap: 4px;
+            align-items: flex-start;
+        }
+
+        #pf-timing {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        #pf-footer {
+            padding: 12px 16px 14px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .pfbtn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+
+        .pfbtn:hover {
+            opacity: 0.86;
+        }
+
+        .pfbtn:active {
+            transform: scale(0.97);
+        }
+
+        .pfbtn-proceed {
+            background: #238636;
+            color: #fff;
+        }
+
+        .pfbtn-danger {
+            background: rgba(215, 58, 73, 0.18);
+            color: #f14c4c;
+            border: 1px solid rgba(215, 58, 73, 0.35);
+        }
+
+        .pfbtn-cancel {
+            background: var(--hover-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .pfbtn-dismiss {
+            background: var(--accent);
+            color: #fff;
+        }
+    </style>
+
+    <div id="preflight-overlay">
+        <div id="preflight-card">
+            <div id="pf-header">
+                <span id="pf-icon">&#129302;</span>
+                <span id="pf-title">AI Pre-flight Check</span>
+                <span id="pf-provider"></span>
+            </div>
+            <div id="pf-body">
+                <ul class="scan-steps" id="pf-scanning">
+                    <li class="scan-step" id="ps-1"><span class="scan-dot"></span>Reading git status &amp; branch</li>
+                    <li class="scan-step" id="ps-2"><span class="scan-dot"></span>Scanning changed files</li>
+                    <li class="scan-step" id="ps-3"><span class="scan-dot"></span>Checking secrets &amp; .env files</li>
+                    <li class="scan-step" id="ps-4"><span class="scan-dot"></span>Running AI code review</li>
+                    <li class="scan-step" id="ps-5"><span class="scan-dot"></span>Generating recommendations</li>
+                </ul>
+                <div id="pf-passed-view">
+                    <div class="pf-passed-icon">&#9989;</div>
+                    <div style="font-weight:700;margin-bottom:5px;">All Checks Passed!</div>
+                    <div id="pf-passed-msg" style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;"></div>
+                    <div style="font-size:11px;color:var(--text-secondary);">Proceeding automatically...</div>
+                </div>
+                <div id="pf-result">
+                    <div id="pf-summary"></div>
+                    <div id="pf-issues"></div>
+                    <div id="pf-timing"></div>
+                </div>
+            </div>
+            <div id="pf-footer" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var _scanIv = null;
+
+            // Per-operation scan steps — context-aware steps for each git operation
+            var OP_STEPS = {
+                'fast-push': [
+                    'Staging &amp; scanning all changed files',
+                    'Detecting .env files &amp; hardcoded secrets',
+                    'Reviewing code quality &amp; debug artifacts',
+                    'Analyzing branch &amp; push safety',
+                    'Running AI deep code review'
+                ],
+                'push': [
+                    'Reading committed changes',
+                    'Checking for secrets in tracked files',
+                    'Reviewing code quality',
+                    'Analyzing branch push safety',
+                    'Running AI review'
+                ],
+                'commit': [
+                    'Reading staged changes',
+                    'Checking for secrets &amp; credentials',
+                    'Reviewing code quality',
+                    'Verifying no large binary files',
+                    'Running AI review'
+                ],
+                'merge': [
+                    'Reading branch differences',
+                    'Analyzing potential merge conflicts',
+                    'Checking merge target branch safety',
+                    'Reviewing change impact',
+                    'Running AI merge analysis'
+                ],
+                'pull': [
+                    'Checking local uncommitted changes',
+                    'Detecting potential merge conflicts',
+                    'Reviewing remote changes',
+                    'Analyzing conflict risk',
+                    'Running AI analysis'
+                ],
+                'stash': [
+                    'Reading current working changes',
+                    'Reviewing files to be stashed',
+                    'Running AI quick review',
+                    'Generating summary',
+                    'Analysis complete'
+                ],
+                'rebase': [
+                    'Reading local commit history',
+                    'Checking if branch is shared/public',
+                    'Analyzing rebase impact',
+                    'Detecting history rewrite risks',
+                    'Running AI safety check'
+                ]
+            };
+            var DEFAULT_STEPS = [
+                'Reading git status',
+                'Scanning changed files',
+                'Checking for issues',
+                'Running AI review',
+                'Generating report'
+            ];
+
+            function esc(s) {
+                if (!s) { return ''; }
+                return String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function pfShow(op) {
+                var steps = OP_STEPS[op] || DEFAULT_STEPS;
+                document.getElementById('pf-title').textContent = 'AI Pre-flight: ' + op;
+                document.getElementById('pf-provider').textContent = '';
+                document.getElementById('pf-icon').innerHTML = '&#129302;';
+                document.getElementById('pf-scanning').style.display = 'block';
+                document.getElementById('pf-result').style.display = 'none';
+                document.getElementById('pf-passed-view').style.display = 'none';
+                document.getElementById('pf-footer').style.display = 'none';
+
+                // Set step labels dynamically based on operation
+                var stepIds = ['ps-1', 'ps-2', 'ps-3', 'ps-4', 'ps-5'];
+                stepIds.forEach(function (id, i) {
+                    var el = document.getElementById(id);
+                    if (el) {
+                        el.className = 'scan-step';
+                        el.innerHTML = '<span class="scan-dot"></span>' + (steps[i] || '');
+                    }
+                });
+
+                var step = 0;
+                function adv() {
+                    if (step > 0 && step <= stepIds.length) {
+                        var p = document.getElementById(stepIds[step - 1]);
+                        if (p) { p.className = 'scan-step pf-done'; }
+                    }
+                    if (step < stepIds.length) {
+                        var c = document.getElementById(stepIds[step]);
+                        if (c) { c.className = 'scan-step pf-active'; }
+                        step++;
+                    }
+                }
+                adv();
+                if (_scanIv) { clearInterval(_scanIv); }
+                _scanIv = setInterval(adv, 720);
+                document.getElementById('preflight-overlay').classList.add('pf-visible');
+            }
+
+            function pfShowResult(data) {
+                if (_scanIv) { clearInterval(_scanIv); _scanIv = null; }
+                // Mark all steps done
+                ['ps-1', 'ps-2', 'ps-3', 'ps-4', 'ps-5'].forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el) { el.className = 'scan-step pf-done'; }
+                });
+                if (!data || !data.result) { pfHide(); return; }
+
+                var r = data.result;
+                var provLabel = r.provider === 'copilot' ? '&#129302; GitHub Copilot'
+                    : r.provider === 'gemini' ? '&#128302; Gemini AI'
+                        : 'AI';
+                document.getElementById('pf-provider').innerHTML = provLabel;
+                document.getElementById('pf-scanning').style.display = 'none';
+                var footer = document.getElementById('pf-footer');
+                footer.style.display = 'flex';
+
+                if (!r.issues || r.issues.length === 0) {
+                    // All clear — user must explicitly click Proceed (no auto-proceed)
+                    document.getElementById('pf-icon').innerHTML = '&#9989;';
+                    document.getElementById('pf-title').textContent = 'All Checks Passed';
+                    document.getElementById('pf-passed-view').style.display = 'block';
+                    document.getElementById('pf-passed-msg').textContent = r.summary || 'No issues found. Safe to proceed.';
+                    footer.innerHTML =
+                        '<button class="pfbtn pfbtn-cancel" onclick="window.pfRespond(false)">&#10006; Cancel</button>'
+                        + '<button class="pfbtn pfbtn-dismiss" onclick="window.pfRespond(true)">&#10003; Proceed with Operation</button>';
+                    return;
+                }
+
+                var errs = r.issues.filter(function (i) { return i.severity === 'error'; });
+                var hasErr = errs.length > 0;
+                document.getElementById('pf-icon').innerHTML = hasErr ? '&#9940;' : '&#9888;&#65039;';
+                document.getElementById('pf-title').textContent = hasErr ? 'Issues Found — Review Required' : 'Warnings Detected';
+                document.getElementById('pf-result').style.display = 'block';
+                document.getElementById('pf-summary').innerHTML =
+                    '<span>' + (hasErr ? '&#10060;' : '&#9888;') + '</span>'
+                    + '<span style="margin-left:5px">' + esc(r.summary) + '</span>';
+                document.getElementById('pf-timing').textContent =
+                    'Scanned in ' + (r.durationMs || 0) + 'ms · ' + (r.provider === 'copilot' ? 'GitHub Copilot' : r.provider === 'gemini' ? 'Gemini AI' : 'AI');
+
+                var issHtml = r.issues.map(function (issue) {
+                    var sev = issue.severity || 'warning';
+                    var sevTx = { error: '&#10006; Error', warning: '&#9888; Warning', info: '&#8505; Info' }[sev] || sev;
+                    var fileStr = issue.file
+                        ? '<div class="pf-file">' + esc(issue.file) + (issue.line ? ':' + issue.line : '') + '</div>'
+                        : '';
+                    return '<div class="pf-issue ' + sev + '">'
+                        + '<div class="pf-issue-hdr">'
+                        + '<span class="pf-sev sev-' + sev + '">' + sevTx + '</span>'
+                        + '<span class="pf-issue-title">' + esc(issue.title) + '</span>'
+                        + '</div>'
+                        + fileStr
+                        + '<div class="pf-desc">' + esc(issue.description) + '</div>'
+                        + '<div class="pf-sol"><span>&#128161;</span><span>' + esc(issue.solution) + '</span></div>'
+                        + '</div>';
+                }).join('');
+                document.getElementById('pf-issues').innerHTML = issHtml;
+
+                if (hasErr) {
+                    footer.innerHTML =
+                        '<button class="pfbtn pfbtn-cancel" onclick="window.pfRespond(false)">&#10006; Cancel Operation</button>'
+                        + '<button class="pfbtn pfbtn-danger" onclick="window.pfRespond(true)">Proceed Anyway</button>';
+                } else {
+                    footer.innerHTML =
+                        '<button class="pfbtn pfbtn-cancel" onclick="window.pfRespond(false)">&#10006; Cancel</button>'
+                        + '<button class="pfbtn pfbtn-proceed" onclick="window.pfRespond(true)">&#10003; Proceed</button>';
+                }
+            }
+
+            function pfRespond(proceed) {
+                pfHide();
+                vscode.postMessage({ type: 'preflight-response', value: proceed ? 'proceed' : 'cancel' });
+            }
+
+            function pfHide() {
+                if (_scanIv) { clearInterval(_scanIv); _scanIv = null; }
+                var o = document.getElementById('preflight-overlay');
+                if (o) { o.classList.remove('pf-visible'); }
+            }
+
+            window.pfRespond = pfRespond;
+            window.pfHide = pfHide;
+
+            window.addEventListener('message', function (evt) {
+                var msg = evt.data;
+                if (!msg) { return; }
+                if (msg.type === 'ai-preflight-start') { pfShow(msg.value || 'operation'); }
+                if (msg.type === 'show-preflight-dialog') { pfShowResult(msg.value); }
+                if (msg.type === 'close-preflight-dialog') { pfHide(); }
+                if (msg.type === 'ai-preflight-done' && msg.value && msg.value.skipped) { pfHide(); }
+            });
+        })();
+    </script>
+
 </body>
 
 </html>

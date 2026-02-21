@@ -1,5 +1,41 @@
 // Shared types for Gitsy extension
 
+// ─────────────────── AI Pre-flight ───────────────────
+
+export interface PreflightIssue {
+    title: string;
+    file?: string;
+    line?: number;
+    description: string;
+    solution: string;
+    severity: 'error' | 'warning' | 'info';
+}
+
+export interface PreflightResult {
+    passed: boolean;
+    skipped: boolean;        // true if no AI model available
+    issues: PreflightIssue[];
+    summary: string;
+    durationMs: number;
+    provider: 'copilot' | 'gemini' | 'none';
+}
+
+// ─────────────────── Flow Logger ───────────────────
+
+export interface FlowEntry {
+    id: string;
+    operation: string;       // 'fast-push', 'commit', 'pull', etc.
+    details: string;         // e.g. '→ main | "fix login bug"'
+    status: 'running' | 'success' | 'failed' | 'cancelled';
+    startTime: number;
+    endTime?: number;
+    durationMs?: number;
+    error?: string;
+    preflightStatus?: 'passed' | 'failed' | 'skipped';
+    branch: string;
+    repoName: string;
+}
+
 export interface UserProfile {
     login: string;
     name: string;
